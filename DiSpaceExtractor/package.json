@@ -1,0 +1,16 @@
+{
+  "name": "dispace.extractor",
+  "private": true,
+  "dependencies": {
+    "sqlite3": "^5.0.2"
+  },
+  "devDependencies": {
+    "typescript": "^4.4.4",
+    "@types/node": "^16.11.7"
+  },
+  "scripts": {
+    "start": "node out/main.js",
+    "prestart": "npm run build",
+    "build": "tsc"
+  }
+}
