@@ -3,7 +3,7 @@ export type GetAttemptAPIResult = { error: string } | Attempt;
 export type Attempt = {
   simple: AttemptSummary,
   res_array: {
-    [duId: number]: UnitResults,
+    [duId: number]: UnitResult,
     final_result: { score: number, max_score: number },
   },
   menu_str: string, // what the heck is that
@@ -11,9 +11,9 @@ export type Attempt = {
 export type AttemptSummary = {
   id: string,
   test_start_time: string,
-  test_end_time: string,
+  test_end_time: string | null,
   score: string,
-  max_score: string,
+  max_score: string, // unreliable
   show_results: string,
   num_of_opened_questions: string,
   trial: string,
@@ -23,21 +23,21 @@ export type AttemptSummary = {
   revision_number: string | null,
 }
 
-export type UnitResults = {
-  didact: UnitResultsSummary,
-  [themeId: number]: ThemeResults,
+export type UnitResult = {
+  didact: UnitResultSummary,
+  [themeId: number]: ThemeResult,
 }
-export type UnitResultsSummary = ThemeResultsSummary & {
+export type UnitResultSummary = ThemeResultSummary & {
   _score: number,
   _max_score: number,
 }
 
-export type ThemeResults = {
+export type ThemeResult = {
   [questionId: number]: Answer,
-  param: ThemeResultsSummary,
+  param: ThemeResultSummary,
   result: { score: number, max_score: number },
 }
-export type ThemeResultsSummary = {
+export type ThemeResultSummary = {
   id: string,
   name: string | null,
   identifier: string,
@@ -76,7 +76,7 @@ export type SimpleAnswerInfo = AnswerInfo & {
   mapping?: { [hash: string]: number },
   shuffle: string,
   modalFeedback: string | false,
-  upperBound: number,
+  upperBound?: number,
   maxChoices: string, // 0 for ∞
   simpleChoice: { [hash: string]: string },
 }

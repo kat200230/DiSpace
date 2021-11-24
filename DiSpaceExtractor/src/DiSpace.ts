@@ -1,116 +1,204 @@
+import * as SQLite from 'better-sqlite3';
+
+export type Test = {
+  id: number, // pk
+  units: Unit[],
+}
 export type Attempt = {
-  id: number,
-  test_id: number,
-  user_id: number,
-  started_at: string,
-  finished_at: string,
+  id: number, // pk
+  test_id: number, // index
+  user_id: number, // index
+  started_at: number,
+  finished_at: number | null,
   score: number,
-  max_score: number,
+  max_score: number, // unreliable, gives independent results
   show_results_mode: string,
   open_question_count: number,
   is_trial: boolean,
   set_as_read: boolean,
   revision_number: number,
-  units: UnitResults[],
+  units: UnitResult[],
 }
-export type UnitResults = {
-  unit_id: number,
-  unit_hash: string,
+
+export type Unit = {
+  id: number, // pk
+  test_id: number, // index
+  hash: string,    // index
   name: string | null,
   description: string | null,
+  selection: number,
   is_visible: boolean,
   is_shuffled: boolean,
-  selection: number,
+  themes: Theme[],
+}
+export type UnitResult = {
+  attempt_id: number, // pk
+  unit_id: number,    // pk
+  // unit_hash: string,
   score: number,
   max_score: number,
-  themes: ThemeResults[],
+  themes: ThemeResult[],
 }
-export type ThemeResults = {
-  theme_id: number,
-  theme_hash: string,
+
+export type Theme = {
+  id: number, // pk
+  unit_id: number, // index
+  hash: string,    // index
   name: string | null,
   description: string | null,
+  selection: number,
   is_visible: boolean,
   is_shuffled: boolean,
-  selection: number,
+  questions: Question[],
+}
+export type ThemeResult = {
+  attempt_id: number, // pk
+  theme_id: number,   // pk
+  // theme_hash: string,
   score: number,
   max_score: number,
   answers: Answer[],
 }
-export interface Answer {
-  question_id: number,
-  html: string,
+
+export interface Question {
+  id: number, // pk
+  theme_id: number, // index
   title: string,
   prompt: string,
-  score: number,
-  max_score: number,
+  max_score: number | null, // null, if it wasn't discovered yet, like in case with open questions
   show_solution: boolean,
-  type_old: number,
+  type_original: number,
   type: number,
+  // Derived properties:
+  // is_shuffled: boolean, - all, except for custom input and open
+  // modal_feedback: string | null, - simple, associative, order
+  // max_choices: number, - simple
+  // correct: [string, string][], // ids □;□|□;□|□;□ - pairs
+  // correct: string[], // ids □|□|□ - order
+  // correct: { pattern: string, score: number }[], // □/□|□/□|□/□ (replace '/' with '&s;' and '|' with '&p;' in pattern) - custom input
 }
-export interface Choice {
-  option_id: number,
-  option_hash: string,
-  text: string,
+export interface Answer {
+  attempt_id: number,  // pk
+  question_id: number, // pk
+  // html: string,
+  score: number,
+  type: number,
+  // Derived properties:
+  // response: string[], // ids □|□|□ - simple
+  // response: [string, string][], // ids □;□|□;□|□;□ - pair
+  // response: [string, string][], // ids □;□|□;□|□;□ (row;column) - associative
+  // response: string[], // ids □|□|□ - order
+  // response: string, - custom input and open
 }
 
-export type SimpleAnswer = Answer & {
-  // type_old: 1 | 2,
-  // type: 1,
+export interface Option {
+  hash: string, // pk
+  id: number | null,   // index
+  question_id: number, // index
+  text: string,
+  // Derived properties:
+  // score: number, - simple
+  // is_correct: boolean, // prop? - simple
+  // max_matches: number, - pair
+  // mapping: { hash: string, score: number, is_correct: boolean }[], // □;□;□|□;□;□|□;□;□ - associative row
+  // 
+}
+
+export type SimpleQuestion = Question & {
   is_shuffled: boolean,
   modal_feedback: string | null,
-  max_choices: number, // 0 ~ ∞
-  choices: SimpleChoice[],
-  response: number[], // indices
+  max_choices: number,
+  options: SimpleOption[],
+  // type_original: 1 | 2,
+  // type: 1,
 }
-export type SimpleChoice = Choice & {
+export type SimpleOption = Option & {
   score: number,
-  is_correct: boolean,
+  is_correct: boolean, // prop?
+}
+export type SimpleAnswer = Answer & {
+  response: string[], // ids □|□|□
+  // type: 1,
 }
 
-export type PairAnswer = Answer & {
-  // type_old: 3,
-  // type: 2,
+export type PairQuestion = Question & {
   is_shuffled: boolean,
-  choices: PairChoice[],
-  response: [number, number][], // indices
-  correct: [number, number][], // indices
+  options: PairOption[],
+  correct: [string, string][], // ids □;□|□;□|□;□
+  // type_original: 3,
+  // type: 2,
 }
-export type PairChoice = Choice & {
+export type PairOption = Option & {
   max_matches: number,
 }
+export type PairAnswer = Answer & {
+  response: [string, string][], // ids □;□|□;□|□;□
+  // type: 2,
+}
 
-export type AssociativeAnswer = Answer & {
-  // type_old: 4,
-  // type: 3,
+export type AssociativeQuestion = Question & {
   is_shuffled: boolean,
   modal_feedback: string | null,
   rows: AssociativeRow[],
-  columns: Choice[],
+  columns: AssociativeColumn[],
+  correct: [string, string][], // ids □;□|□;□|□;□ (row;column)
+  // type_original: 4,
+  // type: 3,
 }
-export type AssociativeRow = Choice & {
-  mapping: { index: number, score: number, is_correct: boolean }[],
-  response: number, // -1 ~ not selected
+export type AssociativeRow = Option & {
+  mapping: { hash: string, score: number, is_correct: boolean }[], // □;□;□|□;□;□|□;□;□
+}
+export type AssociativeColumn = Option;
+export type AssociativeAnswer = Answer & {
+  response: [string, string][], // ids □;□|□;□|□;□ (row;column)
+  // type: 3,
 }
 
-export type OrderAnswer = Answer & {
-  // type_old: 6,
-  // type: 4,
+export type OrderQuestion = Question & {
   is_shuffled: boolean,
   modal_feedback: string | null,
-  choices: Choice[],
-  response: number[],
+  options: OrderOption[],
+  correct: string[], // ids □|□|□
+  // type_original: 6,
+  // type: 4,
+}
+export type OrderOption = Option;
+export type OrderAnswer = Answer & {
+  response: string[], // ids □|□|□
+  // type: 4,
 }
 
-export type CustomInputAnswer = Answer & {
-  // type_old: 5 | 7,
+export type CustomInputQuestion = Question & {
+  correct: { pattern: string, score: number }[], // □/□|□/□|□/□ (replace '/' with '&s;' and '|' with '&p;' in pattern)
+  // type_original: 5 | 7,
   // type: 5,
-  correct: { pattern: string, score: number }[],
+}
+export type CustomInputAnswer = Answer & {
   response: string,
+  // type: 5,
 }
 
-export type OpenQuestionAnswer = Answer & {
-  // type_old: 8,
+export type OpenQuestion = Question & {
+  // type_original: 8,
   // type: 6,
-  response: string,
 }
+export type OpenQuestionAnswer = Answer & {
+  response: string,
+  // type: 6,
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

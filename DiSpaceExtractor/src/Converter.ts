@@ -1,4 +1,4 @@
-import * as DiSpaceRaw from './DiSpace_Raw';
+import * as Raw from './DiSpace_Raw';
 import * as DiSpace from './DiSpace';
 
 function to_bool(a: boolean | number | string): boolean {
@@ -14,25 +14,33 @@ function to_bool(a: boolean | number | string): boolean {
   else if (+a === 0) return false;
   else throw new Error(`Could not resolve ${a} as a Boolean!`);
 }
-function assert_equal(a: number, b: number, formatter: (a: number, b: number) => string) {
-  if (a !== b) throw new Error(formatter(a, b));
+function to_unix(date: string): number {
+  if (date === null) return null;
+  return Math.round(new Date(date).getTime() / 1000);
+}
+function assert_equal(a: any, b: any, formatter: (a: any, b: any) => string): void {
+  if (a !== b) {
+    throw new Error(formatter(a, b));
+  }
 }
 
-export function convert_attempt(attempt: DiSpaceRaw.Attempt): DiSpace.Attempt {
-  const simple = attempt.simple;
-  const res_array = attempt.res_array;
-  const unitIds = Object.keys(res_array).filter(i => i !== "final_result");
+export function convert_attempt(a: Raw.Attempt): [DiSpace.Test, DiSpace.Attempt] {
+  const simple = a.simple;
+  const res_array = a.res_array;
 
-  // assert_equal(+simple.score, res_array.final_result.score);
-  // assert_equal(+simple.max_score, res_array.final_result.max_score);
-  // it seems that old units were wiped, and final_result gives incorrect results
+  const units: DiSpace.Unit[] = [];
+  const unit_results: DiSpace.UnitResult[] = [];
 
-  return {
+  const test: DiSpace.Test = {
+    id: +simple.test_id,
+    units: units,
+  };
+  const attempt: DiSpace.Attempt = {
     id: +simple.id,
-    test_id: +simple.test_id,
+    test_id: test.id,
     user_id: +simple.user_id,
-    started_at: simple.test_start_time,
-    finished_at: simple.test_end_time,
+    started_at: to_unix(simple.test_start_time),
+    finished_at: to_unix(simple.test_end_time),
     score: +simple.score,
     max_score: +simple.max_score,
     show_results_mode: simple.show_results,
@@ -40,194 +48,243 @@ export function convert_attempt(attempt: DiSpaceRaw.Attempt): DiSpace.Attempt {
     is_trial: to_bool(simple.trial),
     set_as_read: to_bool(simple.set_as_read),
     revision_number: +simple.revision_number,
-    units: unitIds.map(id => {
-      const unitRaw = res_array[id] as DiSpaceRaw.UnitResults;
-      const unit = convert_unit(unitRaw);
-      assert_equal(unit.unit_id, +unitRaw.didact.id,
-        (a, b) => `Unit id is inconsistent: ${a} !== ${b}.`);
-      return unit;
-    }),
-  }
-}
-export function convert_unit(unit: DiSpaceRaw.UnitResults): DiSpace.UnitResults {
-  const didact = unit.didact;
-  const themeIds = Object.keys(unit).filter(i => i !== "didact");
-
-  return {
-    unit_id: +didact.id,
-    unit_hash: didact.identifier,
-    name: didact.name,
-    description: didact.description,
-    is_visible: to_bool(didact.visible),
-    is_shuffled: to_bool(didact.shuffle),
-    selection: +didact.selection,
-    score: didact._score,
-    max_score: didact._max_score,
-    themes: themeIds.map(i => {
-      const themeRaw = unit[i] as DiSpaceRaw.ThemeResults;
-      const theme = convert_theme(themeRaw);
-      assert_equal(theme.theme_id, +themeRaw.param.id,
-        (a, b) => `Theme id is inconsistent: ${a} !== ${b}.`);
-      return theme;
-    }),
-  }
-}
-export function convert_theme(theme: DiSpaceRaw.ThemeResults): DiSpace.ThemeResults {
-  const param = theme.param;
-  const questionIds = Object.keys(theme).filter(i => i !== "param" && i !== "result");
-
-  return {
-    theme_id: +param.id,
-    theme_hash: param.identifier,
-    name: param.name,
-    description: param.description,
-    is_visible: to_bool(param.visible),
-    is_shuffled: to_bool(param.shuffle),
-    selection: +param.selection,
-    score: theme.result.score,
-    max_score: theme.result.max_score,
-    answers: questionIds.map(i => {
-      const answerRaw = theme[i] as DiSpaceRaw.Answer;
-      const answer = convert_answer(answerRaw);
-      assert_equal(answer.question_id, +answerRaw.item.id,
-        (a, b) => `Question id is inconsistent: ${a} !== ${b}.`);
-      return answer;
-    }),
-  }
-}
-
-export function convert_answer(answer: DiSpaceRaw.Answer): DiSpace.Answer {
-  const item = answer.item;
-  const type_old = +item.type;
-
-  const general: DiSpace.Answer = {
-    question_id: +item.id,
-    html: answer.view,
-    title: item.title,
-    prompt: item.prompt,
-    score: answer.responses[2],
-    max_score: answer.responses[3],
-    show_solution: to_bool(item.showSolution),
-    type_old: type_old,
-    type: undefined,
+    units: unit_results,
   };
 
-  if (type_old === 1 || type_old === 2) {
-    general.type = 1;
-    return convert_simple_answer(general, item as DiSpaceRaw.SimpleAnswerInfo, answer);
-  }
-  else if (type_old === 3) {
-    general.type = 2;
-    return convert_pair_answer(general, item as DiSpaceRaw.PairAnswerInfo, answer);
-  }
-  else if (type_old === 4) {
-    general.type = 3;
-    return convert_associative_answer(general, item as DiSpaceRaw.AssociativeAnswerInfo, answer);
-  }
-  else if (type_old === 6) {
-    general.type = 4;
-    return convert_order_answer(general, item as DiSpaceRaw.OrderAnswerInfo, answer);
-  }
-  else if (type_old === 5 || type_old === 7) {
-    general.type = 5;
-    return convert_custom_input_answer(general, item as DiSpaceRaw.CustomInputAnswerInfo, answer);
-  }
-  else if (type_old === 8) {
-    general.type = 6;
-    return convert_open_question_answer(general, item as DiSpaceRaw.OpenQuestionAnswerInfo, answer);
-  }
-  else throw new Error(`Unknown question type_old ${type_old}!`);
+  const unit_ids = Object.keys(res_array).filter(i => i !== "final_result");
+  unit_ids.map(i => res_array[i] as Raw.UnitResult).forEach(u => {
+    const [unit, unit_result] = convert_unit(u, attempt.id, test.id);
+    units.push(unit);
+    unit_results.push(unit_result);
+  });
+
+  return [test, attempt];
 }
-export function convert_simple_answer(general: DiSpace.Answer, item: DiSpaceRaw.SimpleAnswerInfo, answer: DiSpaceRaw.Answer): DiSpace.SimpleAnswer {
-  if (general.type_old === 1) assert_equal(+item.maxChoices, 1,
+export function convert_unit(u: Raw.UnitResult, attempt_id: number, test_id: number): [DiSpace.Unit, DiSpace.UnitResult] {
+  const didact = u.didact;
+
+  const themes: DiSpace.Theme[] = [];
+  const theme_results: DiSpace.ThemeResult[] = [];
+
+  const unit: DiSpace.Unit = {
+    id: +didact.id,
+    test_id: test_id,
+    hash: didact.identifier.split("_")[1],
+    name: didact.name,
+    description: didact.description,
+    selection: +didact.selection,
+    is_visible: to_bool(didact.visible),
+    is_shuffled: to_bool(didact.shuffle),
+    themes: themes,
+  };
+  const unit_result: DiSpace.UnitResult = {
+    attempt_id: attempt_id,
+    unit_id: unit.id,
+    score: +didact._score,
+    max_score: +didact._max_score,
+    themes: theme_results,
+  };
+
+  const theme_ids = Object.keys(u).filter(i => i !== "didact");
+  theme_ids.map(i => u[i] as Raw.ThemeResult).forEach(t => {
+    const [theme, theme_result] = convert_theme(t, attempt_id, unit.id);
+    themes.push(theme);
+    theme_results.push(theme_result);
+  });
+
+  return [unit, unit_result];
+}
+export function convert_theme(t: Raw.ThemeResult, attempt_id: number, unit_id: number): [DiSpace.Theme, DiSpace.ThemeResult] {
+  const param = t.param;
+  const result = t.result;
+
+  const questions: DiSpace.Question[] = [];
+  const answers: DiSpace.Answer[] = [];
+
+  const theme: DiSpace.Theme = {
+    id: +param.id,
+    unit_id: unit_id,
+    hash: param.identifier.split("_")[1],
+    name: param.name,
+    description: param.description,
+    selection: +param.selection,
+    is_visible: to_bool(param.visible),
+    is_shuffled: to_bool(param.shuffle),
+    questions: questions,
+  };
+  const theme_result: DiSpace.ThemeResult = {
+    attempt_id: attempt_id,
+    theme_id: theme.id,
+    score: +result.score,
+    max_score: +result.max_score,
+    answers: answers,
+  };
+  
+  const question_ids = Object.keys(t).filter(i => i !== "param" && i !== "result");
+  question_ids.map(i => t[i] as Raw.Answer).forEach(a => {
+    const [question, answer] = convert_answer(a, attempt_id, theme.id);
+    questions.push(question);
+    answers.push(answer);
+  });
+
+  return [theme, theme_result];
+}
+export function convert_answer(a: Raw.Answer, attempt_id: number, theme_id: number): [DiSpace.Question, DiSpace.Answer] {
+  const item = a.item;
+  const type_original = +item.type;
+
+  const gen_question: DiSpace.Question = {
+    id: +item.id,
+    theme_id: theme_id,
+    title: item.title,
+    prompt: item.prompt,
+    max_score: +a.responses[3],
+    show_solution: to_bool(item.showSolution),
+    type_original: type_original,
+    type: undefined,
+  };
+  const gen_answer: DiSpace.Answer = {
+    attempt_id: attempt_id,
+    question_id: gen_question.id,
+    score: +a.responses[2],
+    type: gen_question.type,
+  };
+
+  if (type_original == 1 || type_original == 2) {
+    gen_question.type = gen_answer.type = 1;
+    return convert_simple_answer(a, gen_question, gen_answer);
+  }
+  else if (type_original == 3) {
+    gen_question.type = gen_answer.type = 2;
+    return convert_pair_answer(a, gen_question, gen_answer);
+  }
+  else if (type_original == 4) {
+    gen_question.type = gen_answer.type = 3;
+    return convert_associative_answer(a, gen_question, gen_answer);
+  }
+  else if (type_original == 6) {
+    gen_question.type = gen_answer.type = 4;
+    return convert_order_answer(a, gen_question, gen_answer);
+  }
+  else if (type_original == 5 || type_original == 7) {
+    gen_question.type = gen_answer.type = 5;
+    return convert_custom_input_answer(a, gen_question, gen_answer);
+  }
+  else if (type_original == 8) {
+    gen_question.type = gen_answer.type = 6;
+    return convert_open_question_answer(a, gen_question, gen_answer);
+  }
+  else throw new Error(`Unknown question type: ${type_original}!`);
+
+}
+export function convert_simple_answer(a: Raw.Answer, gen_question: DiSpace.Question, gen_answer: DiSpace.Answer): [DiSpace.SimpleQuestion, DiSpace.SimpleAnswer] {
+  const item = a.item as Raw.SimpleAnswerInfo;
+
+  if (gen_question.type_original === 1) assert_equal(+item.maxChoices, 1,
     (a, b) => `Answer ${item.id} (type 1) has invalid .maxChoices value: ${a} !== ${b}.`);
-  assert_equal(general.max_score, +item.upperBound,
+  if (item.upperBound) assert_equal(gen_question.max_score, +item.upperBound,
     (a, b) => `Answer ${item.id}'s .max_score/.upperBound is inconsistent: ${a} !== ${b}.`);
 
+  const options : DiSpace.SimpleOption[] = [];
+
+  const question: DiSpace.SimpleQuestion = {
+    ...gen_question,
+    is_shuffled: to_bool(item.shuffle),
+    modal_feedback: item.modalFeedback || null,
+    max_choices: +item.maxChoices,
+    options: options,
+  };
+
   const optionHashes = Object.keys(item.simpleChoice);
-  const optionIds = answer.responses[4].split(",");
+  const responseHashes = item.response ? Object.keys(item.response) : [];
+  const optionIds = a.responses[4].split(",");
   
   const correctHashes = Array.isArray(item.correctResponse) ? item.correctResponse : [item.correctResponse];
 
   let mapping = item.mapping;
   if (!mapping) { // polyfill
-    const count = Array.isArray(item.correctResponse) ? item.correctResponse.length : 1;
-    const delta = Math.round(general.max_score / count * 100) / 100;
-    let remainingPoints = general.max_score;
+    const count = correctHashes.length;
+    const delta = Math.floor(question.max_score / count * 100) / 100;
+    let remainingPoints = question.max_score;
 
     mapping = {};
+    let lastCorrectHash = null;
     for (let optionHash of optionHashes) {
       if (correctHashes.includes(optionHash)) {
         remainingPoints -= delta;
-        let myScore = delta;
-        if (remainingPoints < 0) myScore += remainingPoints;
-        mapping[optionHash] = myScore;
+        mapping[optionHash] = delta;
+        lastCorrectHash = optionHash;
       }
       else mapping[optionHash] = -delta;
     }
-    if (remainingPoints > 0) mapping[correctHashes.at(-1)] += remainingPoints;
+    if (remainingPoints != 0) mapping[lastCorrectHash] += remainingPoints;
   }
-  const responseHashes = item.response ? Object.keys(item.response) : [];
 
-  return {
-    ...general,
-
-    is_shuffled: to_bool(item.shuffle),
-    modal_feedback: item.modalFeedback || null,
-    max_choices: +item.maxChoices,
-
-    choices: optionHashes.map((hash, ind): DiSpace.SimpleChoice => ({
-      option_id: +optionIds[ind],
-      option_hash: hash,
+  optionHashes.forEach((hash, ind) => {
+    options.push({
+      hash: hash.split("_")[1],
+      id: optionIds[ind] ? +optionIds[ind] : null,
+      question_id: question.id,
       text: item.simpleChoice[hash],
-      is_correct: correctHashes.includes(hash),
       score: mapping[hash],
-    })),
+      is_correct: correctHashes.includes(hash),
+    });
+  });
 
-    response: responseHashes.map(h => optionHashes.indexOf(h)),
+  const answer: DiSpace.SimpleAnswer = {
+    ...gen_answer,
+    response: responseHashes.map(h => h.split("_")[1]),
   };
+
+  return [question, answer];
 }
-export function convert_pair_answer(general: DiSpace.Answer, item: DiSpaceRaw.PairAnswerInfo, answer: DiSpaceRaw.Answer): DiSpace.PairAnswer {
-  assert_equal(general.max_score, +item.upperBound,
+export function convert_pair_answer(a: Raw.Answer, gen_question: DiSpace.Question, gen_answer: DiSpace.Answer): [DiSpace.PairQuestion, DiSpace.PairAnswer] {
+  const item = a.item as Raw.PairAnswerInfo;
+
+  if (item.upperBound) assert_equal(gen_question.max_score, +item.upperBound,
     (a, b) => `Answer ${item.id}'s .max_score/.upperBound is inconsistent: ${a} !== ${b}.`);
 
+  const options: DiSpace.PairOption[] = [];
+
   const optionHashes = Object.keys(item.simpleAssociableChoice);
-  const optionIds = answer.responses[4].split(" ");
+  const optionIds = a.responses[4].split(" ");
 
   const responsePairs = !Array.isArray(item.response) ? Object.keys(item.response) : [];
 
-  return {
-    ...general,
-
+  const question: DiSpace.PairQuestion = {
+    ...gen_question,
     is_shuffled: to_bool(item.shuffle),
-
-    choices: optionHashes.map((hash, ind): DiSpace.PairChoice => {
-      const val = item.simpleAssociableChoice[hash];
-      return {
-        option_id: +optionIds[ind],
-        option_hash: hash,
-        text: val.val,
-        max_matches: +val.matchMax,
-      };
-    }),
-
-    response: responsePairs.filter(p => item.response[p]).map(p => {
-      let vals = p.split(" ");
-      return [optionHashes.indexOf(vals[0]), optionHashes.indexOf(vals[1])];
-    }),
-    correct: item.correctResponse.map(p => {
-      let vals = p.split(" ");
-      return [optionHashes.indexOf(vals[0]), optionHashes.indexOf(vals[1])];
-    }),
+    options: options,
+    correct: item.correctResponse.map(p => p.split(" ") as [string, string]),
   };
+
+  optionHashes.forEach((hash, ind) => {
+    const val = item.simpleAssociableChoice[hash];
+    options.push({
+      hash: hash.split("_")[1],
+      id: optionIds[ind] ? +optionIds[ind] : null,
+      question_id: question.id,
+      text: val.val,
+      max_matches: +val.matchMax,
+    });
+  });
+
+  const answer: DiSpace.PairAnswer = {
+    ...gen_answer,
+    response: responsePairs.filter(p => item.response[p]).map(p => p.split(" ").map(s => s.split("_")[1]) as [string, string]),
+  };
+
+  return [question, answer];
 }
-export function convert_associative_answer(general: DiSpace.Answer, item: DiSpaceRaw.AssociativeAnswerInfo, answer: DiSpaceRaw.Answer): DiSpace.AssociativeAnswer {
-  assert_equal(general.max_score, +item.upperBound,
+export function convert_associative_answer(a: Raw.Answer, gen_question: DiSpace.Question, gen_answer: DiSpace.Answer): [DiSpace.AssociativeQuestion, DiSpace.AssociativeAnswer] {
+  const item = a.item as Raw.AssociativeAnswerInfo;
+  
+  if (item.upperBound) assert_equal(gen_question.max_score, +item.upperBound,
     (a, b) => `Answer ${item.id}'s .max_score/.upperBound is inconsistent: ${a} !== ${b}.`);
 
   const colHashes = Object.keys(item.simpleAssociableChoice.cols);
   const rowHashes = Object.keys(item.simpleAssociableChoice.rows);
-  const [colIds, rowIds] = answer.responses[4].split(",").map(ids => ids.split(" "));
+  const [colIds, rowIds] = a.responses[4].split(",").map(ids => ids.split(" "));
 
   let mapping = item.mapping;
   if (!mapping) { // polyfill
@@ -235,81 +292,164 @@ export function convert_associative_answer(general: DiSpace.Answer, item: DiSpac
   }
 
   const mappingKeys = Object.keys(item.mapping);
-  const responsePairs = Object.keys(item.response);
+  const responsePairs = Array.isArray(item.response) ? [] : Object.keys(item.response);
 
-  return {
-    ...general,
+  const question: DiSpace.AssociativeQuestion = {
+    ...gen_question,
 
     is_shuffled: to_bool(item.shuffle),
     modal_feedback: item.modalFeedback || null,
 
     columns: colHashes.map((hash, ind) => ({
-      option_id: colIds ? +colIds[ind] : -1,
-      option_hash: hash,
+      id: colIds ? +colIds[ind] : -1,
+      question_id: gen_question.id,
+      hash: hash.split("_")[1],
       text: item.simpleAssociableChoice.cols[hash],
     })),
-    rows: rowHashes.map((hash, ind): DiSpace.AssociativeRow => {
-      const responsePair = responsePairs.find(p => p.startsWith(hash));
-      
-      return {
-        option_id: rowIds ? +rowIds[ind] : -1,
-        option_hash: hash,
-        text: item.simpleAssociableChoice.rows[hash],
+    rows: rowHashes.map((hash, ind): DiSpace.AssociativeRow => ({
+      id: rowIds ? +rowIds[ind] : -1,
+      question_id: gen_question.id,
+      hash: hash.split("_")[1],
+      text: item.simpleAssociableChoice.rows[hash],
 
-        mapping: mappingKeys.filter(p => p.startsWith(hash)).map(p => {
-          let other = p.split(" ")[1];
-          return {
-            index: colHashes.indexOf(other),
-            score: mapping[p],
-            is_correct: item.correctResponse.includes(p),
-          };
-        }),
+      mapping: mappingKeys.filter(p => p.startsWith(hash)).map(p => {
+        let other = p.split(" ")[1];
+        return {
+          hash: other.split("_")[1],
+          score: mapping[p],
+          is_correct: item.correctResponse.includes(p),
+        };
+      }),
+    })),
 
-        response: responsePair && item.response[responsePair] ? colHashes.indexOf(responsePair.split(" ")[1]) : -1,
-      };
-    }),
+    correct: item.correctResponse.map(p => p.split(" ").map(s => s.split("_")[1]) as [string, string]),
   };
+  const answer: DiSpace.AssociativeAnswer = {
+    ...gen_answer,
+    
+    response: responsePairs.map(p => p.split(" ").map(s => s.split("_")[1]) as [string, string]),
+  };
+
+  return [question, answer];
 }
-export function convert_order_answer(general: DiSpace.Answer, item: DiSpaceRaw.OrderAnswerInfo, answer: DiSpaceRaw.Answer): DiSpace.OrderAnswer {
-  assert_equal(general.max_score, +item.upperBound,
+export function convert_order_answer(a: Raw.Answer, gen_question: DiSpace.Question, gen_answer: DiSpace.Answer): [DiSpace.OrderQuestion, DiSpace.OrderAnswer] {
+  const item = a.item as Raw.OrderAnswerInfo;
+  
+  if (item.upperBound) assert_equal(gen_question.max_score, +item.upperBound,
     (a, b) => `Answer ${item.id}'s .max_score/.upperBound is inconsistent: ${a} !== ${b}.`);
 
   const optionHashes = Object.keys(item.simpleChoice);
-  const optionIds = answer.responses[4].split(" ");
+  const optionIds = a.responses[4].split(" ");
 
-  return {
-    ...general,
+  const question: DiSpace.OrderQuestion = {
+    ...gen_question,
 
     is_shuffled: to_bool(item.shuffle),
     modal_feedback: item.modalFeedback || null,
 
-    choices: item.correctResponse.map(hash => ({
-      option_id: +optionIds[optionHashes.indexOf(hash)],
-      option_hash: hash,
+    options: item.correctResponse.map(hash => ({
+      id: +optionIds[optionHashes.indexOf(hash)],
+      question_id: gen_question.id,
+      hash: hash.split("_")[1],
       text: item.simpleChoice[hash],
     })),
 
-    response: Object.keys(item.response).map(hash => item.correctResponse.indexOf(hash)),
+    correct: item.correctResponse,
   };
+  const answer: DiSpace.OrderAnswer = {
+    ...gen_answer,
+
+    response: Object.keys(item.response).map(k => k.split("_")[1]),
+  };
+
+  return [question, answer];
 }
-export function convert_custom_input_answer(general: DiSpace.Answer, item: DiSpaceRaw.CustomInputAnswerInfo, answer: DiSpaceRaw.Answer): DiSpace.CustomInputAnswer {
-  assert_equal(general.max_score, +item.upperBound,
+export function convert_custom_input_answer(a: Raw.Answer, gen_question: DiSpace.Question, gen_answer: DiSpace.Answer): [DiSpace.CustomInputQuestion, DiSpace.CustomInputAnswer] {
+  const item = a.item as Raw.CustomInputAnswerInfo;
+  
+  if (item.upperBound) assert_equal(gen_question.max_score, +item.upperBound,
     (a, b) => `Answer ${item.id}'s .max_score/.upperBound is inconsistent: ${a} !== ${b}.`);
 
-  return {
-    ...general,
-
+  const question: DiSpace.CustomInputQuestion = {
+    ...gen_question,
+    
     correct: Array.isArray(item.correctResponse)
       ? item.correctResponse.map((pattern, i) => ({ pattern, score: item.mapping[i] }))
-      : [{ pattern: item.correctResponse, score: general.max_score }],
-    response: item.response,
+      : [{ pattern: item.correctResponse, score: gen_question.max_score }],
   };
-}
-export function convert_open_question_answer(general: DiSpace.Answer, item: DiSpaceRaw.OpenQuestionAnswerInfo, answer: DiSpaceRaw.Answer): DiSpace.OpenQuestionAnswer {
-  
-  return {
-    ...general,
+  const answer: DiSpace.CustomInputAnswer = {
+    ...gen_answer,
 
     response: item.response,
   };
+
+  return [question, answer];
+}
+export function convert_open_question_answer(a: Raw.Answer, gen_question: DiSpace.Question, gen_answer: DiSpace.Answer): [DiSpace.OpenQuestion, DiSpace.OpenQuestionAnswer] {
+  const item = a.item as Raw.CustomInputAnswerInfo;
+
+  const answer: DiSpace.CustomInputAnswer = {
+    ...gen_answer,
+    response: item.response,
+  };
+  if (gen_answer.score == 0 && gen_question.max_score == 0) gen_question.max_score = null;
+  // max_score is not known to this particular answer
+
+  return [gen_question, answer];
+}
+
+export function split_up_more(data: [DiSpace.Test, DiSpace.Attempt][]): [DiSpace.Test[], DiSpace.Attempt[], DiSpace.Unit[], DiSpace.UnitResult[], DiSpace.Theme[], DiSpace.ThemeResult[], DiSpace.Question[], DiSpace.Answer[], DiSpace.Option[]] {
+  let tests = data.map(d => d[0]);
+  let attempts = data.map(d => d[1]);
+  let units = tests.flatMap(t => t.units);
+  let unit_results = attempts.flatMap(a => a.units);
+  let themes = units.flatMap(u => u.themes);
+  let theme_results = unit_results.flatMap(u => u.themes);
+  let questions = themes.flatMap(t => t.questions);
+  let answers = theme_results.flatMap(t => t.answers);
+  let options = questions.flatMap(q => {
+    if (q.type === 1 || q.type === 2 || q.type === 4)
+      return (q as any).options;
+    else if (q.type === 3) {
+      return (q as any).rows.concat((q as any).columns);
+    }
+  });
+
+  return [
+    tests,
+    attempts,
+    units,
+    unit_results,
+    themes,
+    theme_results,
+    questions,
+    answers,
+    options,
+  ];
+}
+export function split_up(test: DiSpace.Test, attempt: DiSpace.Attempt): [DiSpace.Unit[], DiSpace.UnitResult[], DiSpace.Theme[], DiSpace.ThemeResult[], DiSpace.Question[], DiSpace.Answer[], DiSpace.Option[]] {
+  let units = test.units;
+  let unit_results = attempt.units;
+  let themes = units.flatMap(u => u.themes);
+  let theme_results = unit_results.flatMap(u => u.themes);
+  let questions = themes.flatMap(t => t.questions);
+  let answers = theme_results.flatMap(t => t.answers);
+  let options = questions.flatMap(q => {
+    if (q.type === 1 || q.type === 2 || q.type === 4)
+      return (q as any).options;
+    else if (q.type === 3) {
+      return (q as any).rows.concat((q as any).columns);
+    }
+    else return [];
+  });
+
+  return [
+    units,
+    unit_results,
+    themes,
+    theme_results,
+    questions,
+    answers,
+    options,
+  ];
 }
