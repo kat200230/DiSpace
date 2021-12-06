@@ -12,6 +12,7 @@ function to_bool(a: boolean | number | string): boolean {
   else if (a === "false") return false;
   else if (+a === 1) return true;
   else if (+a === 0) return false;
+  else if (a === undefined) return false;
   else throw new Error(`Could not resolve ${a} as a Boolean!`);
 }
 function to_unix(date: string): number {
@@ -22,6 +23,13 @@ function assert_equal(a: any, b: any, formatter: (a: any, b: any) => string): vo
   if (a !== b) {
     throw new Error(formatter(a, b));
   }
+}
+function compare(a: string, b: string);
+function compare(a: number, b: number);
+function compare(a: string | number, b: string | number) {
+  if (a < b) return -1;
+  else if (a > b) return 1;
+  else return 0;
 }
 
 export function convert_attempt(a: Raw.Attempt): [DiSpace.Test, DiSpace.Attempt] {
@@ -180,10 +188,8 @@ export function convert_answer(a: Raw.Answer, attempt_id: number, theme_id: numb
 export function convert_simple_answer(a: Raw.Answer, gen_question: DiSpace.Question, gen_answer: DiSpace.Answer): [DiSpace.SimpleQuestion, DiSpace.SimpleAnswer] {
   const item = a.item as Raw.SimpleAnswerInfo;
 
-  if (gen_question.type_original === 1) assert_equal(+item.maxChoices, 1,
-    (a, b) => `Answer ${item.id} (type 1) has invalid .maxChoices value: ${a} !== ${b}.`);
-  if (item.upperBound) assert_equal(gen_question.max_score, +item.upperBound,
-    (a, b) => `Answer ${item.id}'s .max_score/.upperBound is inconsistent: ${a} !== ${b}.`);
+  // if (gen_question.type_original === 1) assert_equal(+item.maxChoices, 1,
+  //   (a, b) => `Answer ${item.id} (type 1) has invalid .maxChoices value: ${a} !== ${b}.`);
 
   const options : DiSpace.SimpleOption[] = [];
 
@@ -191,7 +197,7 @@ export function convert_simple_answer(a: Raw.Answer, gen_question: DiSpace.Quest
     ...gen_question,
     is_shuffled: to_bool(item.shuffle),
     modal_feedback: item.modalFeedback || null,
-    max_choices: +item.maxChoices,
+    max_choices: gen_question.type_original === 1 ? 1 : +item.maxChoices,
     options: options,
   };
 
@@ -222,27 +228,29 @@ export function convert_simple_answer(a: Raw.Answer, gen_question: DiSpace.Quest
 
   optionHashes.forEach((hash, ind) => {
     options.push({
-      hash: hash.split("_")[1],
+      hash: hash.startsWith("Choice_") ? hash.split("_")[1] : hash,
       id: optionIds[ind] ? +optionIds[ind] : null,
       question_id: question.id,
       text: item.simpleChoice[hash],
-      score: mapping[hash],
+      score: Math.round(mapping[hash] * 100) / 100,
       is_correct: correctHashes.includes(hash),
     });
   });
 
   const answer: DiSpace.SimpleAnswer = {
     ...gen_answer,
-    response: responseHashes.map(h => h.split("_")[1]),
+    response: responseHashes.map(h => {
+      let id: number | null = null;
+      try { id = +optionIds[optionHashes.indexOf(h)]; } catch (ex) { }
+      if (id) return id;
+      return h.startsWith("Choice_") ? h.split("_")[1] : h;
+    }),
   };
 
   return [question, answer];
 }
 export function convert_pair_answer(a: Raw.Answer, gen_question: DiSpace.Question, gen_answer: DiSpace.Answer): [DiSpace.PairQuestion, DiSpace.PairAnswer] {
   const item = a.item as Raw.PairAnswerInfo;
-
-  if (item.upperBound) assert_equal(gen_question.max_score, +item.upperBound,
-    (a, b) => `Answer ${item.id}'s .max_score/.upperBound is inconsistent: ${a} !== ${b}.`);
 
   const options: DiSpace.PairOption[] = [];
 
@@ -261,7 +269,7 @@ export function convert_pair_answer(a: Raw.Answer, gen_question: DiSpace.Questio
   optionHashes.forEach((hash, ind) => {
     const val = item.simpleAssociableChoice[hash];
     options.push({
-      hash: hash.split("_")[1],
+      hash: hash.startsWith("Choice_") ? hash.split("_")[1] : hash,
       id: optionIds[ind] ? +optionIds[ind] : null,
       question_id: question.id,
       text: val.val,
@@ -271,27 +279,43 @@ export function convert_pair_answer(a: Raw.Answer, gen_question: DiSpace.Questio
 
   const answer: DiSpace.PairAnswer = {
     ...gen_answer,
-    response: responsePairs.filter(p => item.response[p]).map(p => p.split(" ").map(s => s.split("_")[1]) as [string, string]),
+    response: responsePairs.filter(p => item.response[p]).map(p => p.split(" ")
+      .map(s => s.startsWith("Choice_") ? s.split("_")[1] : s) as [string, string]),
   };
 
   return [question, answer];
 }
 export function convert_associative_answer(a: Raw.Answer, gen_question: DiSpace.Question, gen_answer: DiSpace.Answer): [DiSpace.AssociativeQuestion, DiSpace.AssociativeAnswer] {
   const item = a.item as Raw.AssociativeAnswerInfo;
-  
-  if (item.upperBound) assert_equal(gen_question.max_score, +item.upperBound,
-    (a, b) => `Answer ${item.id}'s .max_score/.upperBound is inconsistent: ${a} !== ${b}.`);
 
-  const colHashes = Object.keys(item.simpleAssociableChoice.cols);
-  const rowHashes = Object.keys(item.simpleAssociableChoice.rows);
+  let sim = Array.isArray(item.simpleAssociableChoice) ? {cols:{},rows:{}} : item.simpleAssociableChoice;
+  const colHashes = Object.keys(sim.cols ?? {});
+  const rowHashes = Object.keys(sim.rows ?? {});
   const [colIds, rowIds] = a.responses[4].split(",").map(ids => ids.split(" "));
 
   let mapping = item.mapping;
   if (!mapping) { // polyfill
-    throw new Error("Not implemented.");
+    const count = rowHashes.length;
+    const delta = Math.floor(gen_question.max_score / count * 100) / 100;
+    let remainingPoints = gen_question.max_score;
+
+    mapping = {};
+    let lastCorrectPair = null;
+    for (let rowHash of rowHashes) {
+      for (let colHash of colHashes) {
+        let pair = `${rowHash} ${colHash}`;
+        if (item.correctResponse.includes(pair)) {
+          remainingPoints -= delta;
+          mapping[pair] = delta;
+          lastCorrectPair = pair;
+        }
+        else mapping[pair] = -delta;
+      }
+    }
+    if (remainingPoints != 0) mapping[lastCorrectPair] += remainingPoints;
   }
 
-  const mappingKeys = Object.keys(item.mapping);
+  const mappingKeys = Object.keys(mapping);
   const responsePairs = Array.isArray(item.response) ? [] : Object.keys(item.response);
 
   const question: DiSpace.AssociativeQuestion = {
@@ -303,40 +327,37 @@ export function convert_associative_answer(a: Raw.Answer, gen_question: DiSpace.
     columns: colHashes.map((hash, ind) => ({
       id: colIds ? +colIds[ind] : -1,
       question_id: gen_question.id,
-      hash: hash.split("_")[1],
+      hash: hash.startsWith("Choice_") ? hash.split("_")[1] : hash,
       text: item.simpleAssociableChoice.cols[hash],
     })),
     rows: rowHashes.map((hash, ind): DiSpace.AssociativeRow => ({
       id: rowIds ? +rowIds[ind] : -1,
       question_id: gen_question.id,
-      hash: hash.split("_")[1],
+      hash: hash.startsWith("Choice_") ? hash.split("_")[1] : hash,
       text: item.simpleAssociableChoice.rows[hash],
 
       mapping: mappingKeys.filter(p => p.startsWith(hash)).map(p => {
         let other = p.split(" ")[1];
         return {
-          hash: other.split("_")[1],
-          score: mapping[p],
-          is_correct: item.correctResponse.includes(p),
+          hash: other.startsWith("Choice_") ? other.split("_")[1] : other,
+          score: Math.round(mapping[p] * 100) / 100,
+          is_correct: (item.correctResponse || []).includes(p),
         };
-      }),
+      }).sort((a, b) => compare(a.hash, b.hash)),
     })),
 
-    correct: item.correctResponse.map(p => p.split(" ").map(s => s.split("_")[1]) as [string, string]),
+    correct: (item.correctResponse || []).map(p => p.split(" ").map(s => s.startsWith("Choice_") ? s.split("_")[1] : s) as [string, string]),
   };
   const answer: DiSpace.AssociativeAnswer = {
     ...gen_answer,
     
-    response: responsePairs.map(p => p.split(" ").map(s => s.split("_")[1]) as [string, string]),
+    response: responsePairs.map(p => p.split(" ").map(s => s.startsWith("Choice_") ? s.split("_")[1] : s) as [string, string]),
   };
 
   return [question, answer];
 }
 export function convert_order_answer(a: Raw.Answer, gen_question: DiSpace.Question, gen_answer: DiSpace.Answer): [DiSpace.OrderQuestion, DiSpace.OrderAnswer] {
   const item = a.item as Raw.OrderAnswerInfo;
-  
-  if (item.upperBound) assert_equal(gen_question.max_score, +item.upperBound,
-    (a, b) => `Answer ${item.id}'s .max_score/.upperBound is inconsistent: ${a} !== ${b}.`);
 
   const optionHashes = Object.keys(item.simpleChoice);
   const optionIds = a.responses[4].split(" ");
@@ -350,8 +371,8 @@ export function convert_order_answer(a: Raw.Answer, gen_question: DiSpace.Questi
     options: item.correctResponse.map(hash => ({
       id: +optionIds[optionHashes.indexOf(hash)],
       question_id: gen_question.id,
-      hash: hash.split("_")[1],
-      text: item.simpleChoice[hash],
+      hash: hash.startsWith("Choice_") ? hash.split("_")[1] : hash,
+      text: item.simpleChoice[hash] ?? ":unknown:",
     })),
 
     correct: item.correctResponse,
@@ -359,16 +380,18 @@ export function convert_order_answer(a: Raw.Answer, gen_question: DiSpace.Questi
   const answer: DiSpace.OrderAnswer = {
     ...gen_answer,
 
-    response: Object.keys(item.response).map(k => k.split("_")[1]),
+    response: Object.keys(item.response).map(h => {
+      let id: number | null = null;
+      try { id = +optionIds[optionHashes.indexOf(h)]; } catch (ex) { }
+      if (id) return id;
+      return h.startsWith("Choice_") ? h.split("_")[1] : h;
+    }),
   };
 
   return [question, answer];
 }
 export function convert_custom_input_answer(a: Raw.Answer, gen_question: DiSpace.Question, gen_answer: DiSpace.Answer): [DiSpace.CustomInputQuestion, DiSpace.CustomInputAnswer] {
   const item = a.item as Raw.CustomInputAnswerInfo;
-  
-  if (item.upperBound) assert_equal(gen_question.max_score, +item.upperBound,
-    (a, b) => `Answer ${item.id}'s .max_score/.upperBound is inconsistent: ${a} !== ${b}.`);
 
   const question: DiSpace.CustomInputQuestion = {
     ...gen_question,
@@ -380,7 +403,7 @@ export function convert_custom_input_answer(a: Raw.Answer, gen_question: DiSpace
   const answer: DiSpace.CustomInputAnswer = {
     ...gen_answer,
 
-    response: item.response,
+    response: Array.isArray(item.response) ? "" : item.response || "",
   };
 
   return [question, answer];
@@ -390,7 +413,7 @@ export function convert_open_question_answer(a: Raw.Answer, gen_question: DiSpac
 
   const answer: DiSpace.CustomInputAnswer = {
     ...gen_answer,
-    response: item.response,
+    response: Array.isArray(item.response) ? "" : item.response || "",
   };
   if (gen_answer.score == 0 && gen_question.max_score == 0) gen_question.max_score = null;
   // max_score is not known to this particular answer

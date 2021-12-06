@@ -109,7 +109,7 @@ export type AssociativeAnswerInfo = AnswerInfo & {
   upperBound: number,
   simpleAssociableChoice: {
     cols: { [hash: string]: string },
-    rows: { [hash: string]: string }
+    rows: { [hash: string]: string },
   },
 }
 

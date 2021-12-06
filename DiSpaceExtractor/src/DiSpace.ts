@@ -1,4 +1,4 @@
-import * as SQLite from 'better-sqlite3';
+
 
 export type Test = {
   id: number, // pk
@@ -92,9 +92,9 @@ export interface Answer {
 }
 
 export interface Option {
-  hash: string, // pk
-  id: number | null,   // index
-  question_id: number, // index
+  question_id: number, // pk
+  hash: string,        // pk
+  id: number | null, // index
   text: string,
   // Derived properties:
   // score: number, - simple
@@ -117,7 +117,7 @@ export type SimpleOption = Option & {
   is_correct: boolean, // prop?
 }
 export type SimpleAnswer = Answer & {
-  response: string[], // ids □|□|□
+  response: (number | string)[], // ids □|□|□
   // type: 1,
 }
 
@@ -164,7 +164,7 @@ export type OrderQuestion = Question & {
 }
 export type OrderOption = Option;
 export type OrderAnswer = Answer & {
-  response: string[], // ids □|□|□
+  response: (number | string)[], // ids □|□|□
   // type: 4,
 }
 

@@ -5,6 +5,7 @@ export type Diff = {
   field: number,
   old_value: any,
 }
+export type DataRow = (string | number | null)[];
 
 function makeParameters(properties: string[]): [string, string] {
   return [
@@ -22,7 +23,7 @@ function unpackString(str: string): string {
 const [testParameters, testPlaceholders] = makeParameters([
   "id"
 ]);
-function packTest(test: DiSpace.Test): any[] {
+function packTest(test: DiSpace.Test): DataRow {
   return [
     test.id,
   ];
@@ -48,7 +49,7 @@ const [unitParameters, unitPlaceholders] = makeParameters([
   "is_visible",
   "is_shuffled",
 ]);
-function packUnit(unit: DiSpace.Unit): any[] {
+function packUnit(unit: DiSpace.Unit): DataRow {
   return [
     unit.id,
     unit.test_id,
@@ -95,7 +96,7 @@ const [themeParameters, themePlaceholders] = makeParameters([
   "is_visible",
   "is_shuffled",
 ]);
-function packTheme(theme: DiSpace.Theme): any[] {
+function packTheme(theme: DiSpace.Theme): DataRow {
   return [
     theme.id,
     theme.unit_id,
@@ -152,7 +153,7 @@ function packCorrect(q: any): string {
     : q.type === 5 ? q.correct.map(o => `${packString(o.pattern)}/${o.score}`).join("|")
     : null;
 }
-function packQuestion(question: DiSpace.Question): any[] {
+function packQuestion(question: DiSpace.Question): DataRow {
   const q = question as any;
 
   return [
@@ -229,7 +230,7 @@ function packMapping(mapping): string {
   if (mapping == null) return null;
   return mapping.map(m => `${m.hash};${m.score};${m.is_correct ? 1 : 0}`).join("|");
 }
-function packOption(option: DiSpace.Option): any[] {
+function packOption(option: DiSpace.Option): DataRow {
   const o = option as any;
   return [
     option.question_id,
@@ -265,7 +266,7 @@ function diffOption(a: DiSpace.Option, b: DiSpace.Option): Diff[] {
   if (a.text !== b.text) diffs.push({ id: b.hash, field: 3, old_value: a.text });
   const aa = a as any;
   const ba = b as any;
-  if (aa.score !== ba.score) diffs.push({ id: b.hash, field: 4, old_value: aa.score });
+  if (aa.score !== ba.score && Math.abs(aa.score - ba.score) > 0.015) diffs.push({ id: b.hash, field: 4, old_value: aa.score });
   if (aa.is_correct !== ba.is_correct) diffs.push({ id: b.hash, field: 5, old_value: aa.is_correct ? 1 : 0 });
   if (aa.max_matches !== ba.max_matches) diffs.push({ id: b.hash, field: 6, old_value: aa.max_matches });
   const [aM, bM] = [packMapping(aa.mapping), packMapping(ba.mapping)];
@@ -287,7 +288,7 @@ const [attemptParameters, attemptPlaceholders] = makeParameters([
   "set_as_read",
   "revision_number",
 ]);
-function packAttempt(attempt: DiSpace.Attempt): any[] {
+function packAttempt(attempt: DiSpace.Attempt): DataRow {
   return [
     attempt.id,
     attempt.test_id,
@@ -340,7 +341,7 @@ const [unitResultParameters, unitResultPlaceholders] = makeParameters([
   "score",
   "max_score",
 ]);
-function packUnitResult(unit_result: DiSpace.UnitResult): any[] {
+function packUnitResult(unit_result: DiSpace.UnitResult): DataRow {
   return [
     unit_result.attempt_id,
     unit_result.unit_id,
@@ -365,7 +366,7 @@ const [themeResultParameters, themeResultPlaceholders] = makeParameters([
   "score",
   "max_score",
 ]);
-function packThemeResult(theme_result: DiSpace.ThemeResult): any[] {
+function packThemeResult(theme_result: DiSpace.ThemeResult): DataRow {
   return [
     theme_result.attempt_id,
     theme_result.theme_id,
@@ -391,10 +392,10 @@ const [answerParameters, answerPlaceholders] = makeParameters([
   "type",
   "response",
 ]);
-function packAnswer(answer: DiSpace.Answer): any[] {
+function packAnswer(answer: DiSpace.Answer): DataRow {
   const a = answer as any;
   const response =
-    answer.type === 1 || answer.type === 4 ? a.response.join("|")
+    answer.type === 1 || answer.type === 4 ? a.response.length == 1 ? a.response[0] : a.response.join("|")
     : answer.type === 2 || answer.type === 3 ? a.response.map(p => p.join(";")).join("|")
     : /* answer.type === 5 || answer.type === 6 ? */ a.response;
   return [
@@ -413,7 +414,7 @@ function unpackAnswer(data: any[]): DiSpace.Answer {
     score: data[2],
     type: data[3],
   } as any;
-  if (a.type === 1 || a.type === 4) a.response = data[4].split("|");
+  if (a.type === 1 || a.type === 4) a.response = typeof data[4] === "number" ? [data[4]] : data[4].split("|").map(d => +d || d);
   else if (a.type === 2 || a.type === 3) a.response = data[4].split("|").map(p => p.split(";"));
   else if (a.type === 5 || a.type === 6) a.response = data[4];
   return a;
