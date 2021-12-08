@@ -68,7 +68,7 @@ class DBWriter {
     let res = this.testCache[id];
     if (!res) {
       this._getTest = this._getTest ?? this.generateGet("tests");
-      res = Unpack.test(this._getTest.get(id));
+      this.testCache[id] = res = Unpack.test(this._getTest.get(id));
     }
     if (res && !res.units && cascade) res.units = this.getUnitsByTestId(id);
     return res;
@@ -78,7 +78,7 @@ class DBWriter {
     let res = this.unitCache[id];
     if (!res) {
       this._getUnit = this._getUnit ?? this.generateGet("units");
-      res = Unpack.unit(this._getUnit.get(id));
+      this.unitCache[id] = res = Unpack.unit(this._getUnit.get(id));
     }
     if (res && !res.themes && cascade) res.themes = this.getThemesByUnitId(id);
     return res;
@@ -88,7 +88,7 @@ class DBWriter {
     let res = this.themeCache[id];
     if (!res) {
       this._getTheme = this._getTheme ?? this.generateGet("themes");
-      res = Unpack.theme(this._getTheme.get(id));
+      this.themeCache[id] = res = Unpack.theme(this._getTheme.get(id));
     }
     if (res && !res.questions && cascade) res.questions = this.getQuestionsByThemeId(id);
     return res;
@@ -98,7 +98,7 @@ class DBWriter {
     let res = this.questionCache[id];
     if (!res) {
       this._getQuestion = this._getQuestion ?? this.generateGet("questions");
-      res = Unpack.question(this._getQuestion.get(id));
+      this.questionCache[id] = res = Unpack.question(this._getQuestion.get(id));
     }
     if (res && !((res as any).options || (res as any).rows) && cascade) {
       const q = res as any;
@@ -137,7 +137,7 @@ class DBWriter {
     let res = this.attemptCache[id];
     if (!res) {
       this._getAttempt = this._getAttempt ?? this.generateGet("attempts");
-      res = Unpack.attempt(this._getAttempt.get(id));
+      this.attemptCache[id] = res = Unpack.attempt(this._getAttempt.get(id));
     }
     return res;
   }
@@ -221,6 +221,7 @@ class DBWriter {
   updateTest(test: DiSpace.Test, noticed_at: number) {
     let old = this.getTest(test.id, false);
     if (old) {
+	  if (old.name && !test.name) test.name = old.name;
       let diffs = Diff.test(old, test);
       if (diffs.length == 0) return;
       this._setDiffs(this._setTestLog = this._setTestLog ?? this.generateSetLog("log_tests"), diffs, noticed_at);
