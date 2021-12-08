@@ -66,9 +66,11 @@ namespace DiPeek
 		public DiscordClient Discord { get; }
 		public BotConfig Config { get; }
 
+        private static readonly List<Exception> exceptions = new List<Exception>();
+
         public async Task ConnectAsync()
         {
-            await Task.WhenAll(DiSpace.Database.OpenAsync(),
+            await Task.WhenAll(DiSpace.ConnectAsync(),
                                Discord.ConnectAsync());
         }
 
@@ -90,7 +92,8 @@ namespace DiPeek
                     }
                     catch (Exception e)
                     {
-
+                        await cmdArgs.Respond("Произошла ошибка при обработке запроса!", $"`{e.Message}`", "Информация об ошибке была записана в лог.");
+                        exceptions.Add(e);
                     }
                 }
             });
@@ -131,7 +134,7 @@ namespace DiPeek
                         await e.Respond("Слишком короткий запрос. Введите как минимум 3 символа.");
                         return;
                     }
-                    DiSpaceTest[] tests = DiSpace.SearchTests($"%{term}%");
+                    DiSpaceTest[] tests = DiSpace.SearchTests(term);
                     if (tests.Length == 0)
                     {
                         await e.Respond("Не удалось ничего найти.");
@@ -146,29 +149,12 @@ namespace DiPeek
 
                     foreach (DiSpaceTest test2 in tests)
                     {
-                        sb.Append($"===== Тест \"{test2.Name}\" (ID: {test2.Id}) =====");
-                        foreach (DiSpaceUnit unit in test2.Units)
-                        {
-                            sb.Append($"\n--- Раздел \"{unit.Name ?? "*(без названия)*"}\" (Hash: {unit.Hash}");
-                            if (unit.IsShuffled) sb.Append(", вперемешку");
-                            sb.Append("):");
-                            if (!string.IsNullOrWhiteSpace(unit.Description)) sb.Append($"\n--- {CleanString(unit.Description).Limit(100)}.");
-
-                            foreach (DiSpaceTheme theme in unit.Themes)
-                            {
-                                sb.Append($"\n--- --- Тема \"{theme.Name ?? "*(без названия)*"}\" (Hash: {theme.Hash}");
-                                if (theme.IsShuffled) sb.Append(", вперемешку");
-                                sb.Append("):");
-                                if (!string.IsNullOrWhiteSpace(theme.Description)) sb.Append($"\n--- --- {CleanString(theme.Description).Limit(100)}.");
-
-                                sb.Append($"\n--- --- --- {theme.Questions.Count} вопросов.");
-                            }
-                        }
+                        sb.Append($"\n===== Тест \"{test2.Name}\" (ID: {test2.Id}) =====");
                     }
 
                     sb.Append("\n\nИзвлечено с помощью DiPeek: https://discord.gg/tphsh9vsty");
                     string text2 = sb.ToString();
-                    await e.RespondFile("question_search.txt", text2);
+                    await e.RespondFile("test_search.txt", text2);
                     return;
 
                 }
@@ -217,7 +203,7 @@ namespace DiPeek
                 {
                     StringBuilder sb = new StringBuilder();
                     sb.Append("Извлечено с помощью DiPeek: https://discord.gg/tphsh9vsty");
-                    string title = $"|========== ТЕСТ (ID: {test.Id}) ==========|";
+                    string title = $"|========== ТЕСТ \"{test.Name}\" (ID: {test.Id}) ==========|";
                     sb.Append("\n" + new string('=', title.Length));
                     sb.Append("\n" + title);
                     sb.Append("\n" + new string('=', title.Length));
