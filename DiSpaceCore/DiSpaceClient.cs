@@ -4,6 +4,7 @@ using System.Collections.Specialized;
 using System.Data;
 using System.Data.SQLite;
 using System.Diagnostics.CodeAnalysis;
+using System.Threading.Tasks;
 
 namespace DiSpaceCore
 {
@@ -17,6 +18,12 @@ namespace DiSpaceCore
         private Dictionary<int, DiSpaceTheme> themes = new Dictionary<int, DiSpaceTheme>();
         private Dictionary<int, DiSpaceQuestion> questions = new Dictionary<int, DiSpaceQuestion>();
         private Dictionary<int, DiSpaceAttempt> attempts = new Dictionary<int, DiSpaceAttempt>();
+
+        public async Task ConnectAsync()
+        {
+            await Database.OpenAsync();
+            Database.BindFunction(new SQLiteFunctionAttribute("CIC", 2, FunctionType.Scalar), new CaseInsensitiveSearch());
+        }
 
         public void ClearCache()
         {
@@ -211,10 +218,10 @@ namespace DiSpaceCore
             return list.ToArray();
         }
 
-        public DiSpaceTest[] SearchTests(string likePattern)
+        public DiSpaceTest[] SearchTests(string substring)
         {
-            SQLiteCommand searchThemes = new SQLiteCommand($"SELECT * FROM tests WHERE name LIKE @like;", Database);
-            searchThemes.Parameters.Add("@like", DbType.String).Value = likePattern;
+            SQLiteCommand searchThemes = new SQLiteCommand("SELECT * FROM tests WHERE CIC(name, @substring);", Database);
+            searchThemes.Parameters.Add("@substring", DbType.String).Value = substring;
             SQLiteDataReader reader = searchThemes.ExecuteReader();
             List<DiSpaceTest> list = new List<DiSpaceTest>();
             while (reader.Read()) list.Add(new DiSpaceTest(this, reader));
@@ -223,6 +230,11 @@ namespace DiSpaceCore
 
 
 
+    }
+    public class CaseInsensitiveSearch : SQLiteFunction
+    {
+        public override object Invoke(object[] args)
+            => (args[0] as string)?.Contains(args[1] as string ?? string.Empty, StringComparison.InvariantCultureIgnoreCase) ?? false;
     }
     public static class Extensions
     {
