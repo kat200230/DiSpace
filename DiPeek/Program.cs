@@ -9,6 +9,7 @@ using DiSpaceCore;
 using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace DiPeek
 {
@@ -99,17 +100,14 @@ namespace DiPeek
         {
             if (e.MatchCommand("help", "h", "?"))
             {
-                await e.Respond("**Список команд DiPeek:**",
+                await e.Respond("**`help` - список команд DiPeek:**",
                                 "**`test <ID>`** - показывает инфу о тесте с этим ID.",
-                                "***`guide <ID>`** - Work-In-Progress.*",
+                                "**`test <ID> txt`** - вытягивает данные о тесте с этим ID в текстовый файл.",
+                                "**`test search <term>`** - ищет тесты по названию.",
+                                "**`theme search <term>`** - ищет темы с заданным запросом в названии (P.S.: не у всех тем выставлены названия).",
+                                "**`question search <term>`** - то же самое что и команда выше, но выводит вопросы вместо отдельных тем.",
+                                "**`question <ID>`** - показывает инфу о вопросе с этим ID.",
                                 "Введите команду без аргументов для более подробной информации.");
-            }
-            else if (e.MatchCommand("guide", "g"))
-            {
-                await e.Respond("**Команда `guide`:**",
-								"**`guide <ID>`** - эта фича будет служить вам гайдом для прохождения тестов.",
-                                "Вводите айди теста, а потом пишите первые несколько слов попавшегося вам вопроса, и бот ищет вопрос, соответствующий тому, что вы написали, и отправляет ответ на него. Надо не забыть сделать статистическую проверку теста, чтобы примерно узнать, какой процент вопросов покрыт базой данных, чтобы люди сразу знали, что может попасться непокрытый вопрос.",
-                                "***Work-In-Progress***");
             }
             else if (e.MatchCommand("test", "t"))
             {
@@ -117,7 +115,62 @@ namespace DiPeek
                 {
                     await e.Respond("**Команда `test`:**",
                                     "**`test <ID>`** - показывает инфу о тесте с этим ID.",
-									"**`test <ID> text`** - отправляет файл с ответами на тест. Позже сделаю в MD и HTML форматах.");
+									"**`test <ID> text`** - отправляет файл с ответами на тест. Позже сделаю в MD и HTML форматах.",
+                                    "**`test search <term>`** - ищет тест по названию. Может занять некоторое время.");
+                }
+                if (e.MatchArgument("search"))
+                {
+                    if (!e.HasNextArgument)
+                    {
+                        await e.Respond("Вы ничего не ввели. Введите запрос для поиска.");
+                        return;
+                    }
+                    string term = e.NextArgument()!;
+                    if (term.Length < 3)
+                    {
+                        await e.Respond("Слишком короткий запрос. Введите как минимум 3 символа.");
+                        return;
+                    }
+                    DiSpaceTest[] tests = DiSpace.SearchTests($"%{term}%");
+                    if (tests.Length == 0)
+                    {
+                        await e.Respond("Не удалось ничего найти.");
+                        return;
+                    }
+                    StringBuilder sb = new StringBuilder();
+                    sb.Append("Извлечено с помощью DiPeek: https://discord.gg/tphsh9vsty");
+                    string title = $"|========== ПОИСК ПО ВОПРОСАМ С ТЕМАМИ '{term}' ==========|";
+                    sb.Append("\n" + new string('=', title.Length));
+                    sb.Append("\n" + title);
+                    sb.Append("\n" + new string('=', title.Length));
+
+                    foreach (DiSpaceTest test2 in tests)
+                    {
+                        sb.Append($"===== Тест \"{test2.Name}\" (ID: {test2.Id}) =====");
+                        foreach (DiSpaceUnit unit in test2.Units)
+                        {
+                            sb.Append($"\n--- Раздел \"{unit.Name ?? "*(без названия)*"}\" (Hash: {unit.Hash}");
+                            if (unit.IsShuffled) sb.Append(", вперемешку");
+                            sb.Append("):");
+                            if (!string.IsNullOrWhiteSpace(unit.Description)) sb.Append($"\n--- {CleanString(unit.Description).Limit(100)}.");
+
+                            foreach (DiSpaceTheme theme in unit.Themes)
+                            {
+                                sb.Append($"\n--- --- Тема \"{theme.Name ?? "*(без названия)*"}\" (Hash: {theme.Hash}");
+                                if (theme.IsShuffled) sb.Append(", вперемешку");
+                                sb.Append("):");
+                                if (!string.IsNullOrWhiteSpace(theme.Description)) sb.Append($"\n--- --- {CleanString(theme.Description).Limit(100)}.");
+
+                                sb.Append($"\n--- --- --- {theme.Questions.Count} вопросов.");
+                            }
+                        }
+                    }
+
+                    sb.Append("\n\nИзвлечено с помощью DiPeek: https://discord.gg/tphsh9vsty");
+                    string text2 = sb.ToString();
+                    await e.RespondFile("question_search.txt", text2);
+                    return;
+
                 }
                 if (!e.MatchNumberArgument(out int testId))
                 {
@@ -140,7 +193,7 @@ namespace DiPeek
                 if (!e.HasNextArgument)
                 {
                     StringBuilder sb = new StringBuilder();
-                    sb.Append($"Тест (ID: {test.Id}):");
+                    sb.Append($"Тест \"{test.Name}\" (ID: {test.Id}):");
                     foreach (DiSpaceUnit unit in test.Units)
                     {
                         sb.Append($"\n--- Раздел \"{unit.Name ?? "*(без названия)*"}\" (Hash: {unit.Hash}");
@@ -433,11 +486,6 @@ namespace DiPeek
             }
 			else if (e.MatchCommand("theme", "th"))
             {
-                if (!e.HasNextArgument)
-                {
-                    await e.Respond("Используйте это для поиска тем. Иногда айди у тестов меняются, и приходится искать по названиям тем. Не у всех тем стоят какие-либо названия, так что результатов может быть мало.");
-                    return;
-                }
                 if (e.MatchArgument("search", "s"))
                 {
                     if (!e.HasNextArgument)
