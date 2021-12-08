@@ -115,4 +115,67 @@ async function sink(from, to, eachN = 10, chunkSize = 100, delaySeconds = 5) {
     });
 }
 
+function getTestHistory(id) {
+  return new Promise(resolve => {
+    $.ajax({
+      type: 'POST',
+      url: '/ditest/index/result',
+      data: {
+        action: 'get_results_by_student',
+        user_id: id,
+		discipline_id: 'all',
+      },
+      dataType: 'json',
+      success: (data, status, xhr) => resolve(data),
+      error: (xhr, status, err) => {
+        console.log(`ExtractionError: ${err} (${status})`);
+        resolve({ error: `ExtractionError: ${err} (${status})` });
+      },
+    });
+  });
+}
+async function getTestHistoriesHandler(from, to, chunkSize = 100, delaySeconds = 2, chunkHandler) {
+  let curIndex = from;
+  while (curIndex <= to)
+  {
+    let thisChunkSize = Math.min(chunkSize, to - curIndex + 1);
+    let chunkPromises = [];
+    for (let i = 0; i < thisChunkSize; i++)
+    {
+      let myPromise = getTestHistory(curIndex + i);
+      chunkPromises.push(myPromise);
+    }
+    let chunkComplete = await Promise.all(chunkPromises);
+    await chunkHandler(curIndex, curIndex + thisChunkSize - 1, chunkComplete);
+    curIndex += thisChunkSize;
+    if (curIndex <= to) await sleep(delaySeconds * 1000);
+  }
+}
+
+async function sinkTestHistory(from, to, eachN = 100, chunkSize = 100, delaySeconds = 5) {
+  let cxt = { arr: [], start: null };
+  let i = 0;
+  await getTestHistoriesHandler(
+    from, to, chunkSize, delaySeconds,
+    async (start, end, chunk) => {
+
+      if (!cxt.start) cxt.start = start;
+      cxt.arr.push(...chunk);
+
+      if (++i == eachN) {
+        i = 0;
+        let mySlice = cxt.arr;
+        let myStart = cxt.start;
+        cxt.arr = [];
+        cxt.start = null;
+
+        addButton(`${myStart}-${end}.th`, async (button) => {
+          await writeFile(`${myStart}-${end}.th.json`, mySlice);
+          button.remove();
+        });
+      }
+
+    });
+}
+
 clear();

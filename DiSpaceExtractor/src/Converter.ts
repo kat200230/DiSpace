@@ -420,59 +420,12 @@ export function convert_open_question_answer(a: Raw.Answer, gen_question: DiSpac
 
   return [gen_question, answer];
 }
-
-export function split_up_more(data: [DiSpace.Test, DiSpace.Attempt][]): [DiSpace.Test[], DiSpace.Attempt[], DiSpace.Unit[], DiSpace.UnitResult[], DiSpace.Theme[], DiSpace.ThemeResult[], DiSpace.Question[], DiSpace.Answer[], DiSpace.Option[]] {
-  let tests = data.map(d => d[0]);
-  let attempts = data.map(d => d[1]);
-  let units = tests.flatMap(t => t.units);
-  let unit_results = attempts.flatMap(a => a.units);
-  let themes = units.flatMap(u => u.themes);
-  let theme_results = unit_results.flatMap(u => u.themes);
-  let questions = themes.flatMap(t => t.questions);
-  let answers = theme_results.flatMap(t => t.answers);
-  let options = questions.flatMap(q => {
-    if (q.type === 1 || q.type === 2 || q.type === 4)
-      return (q as any).options;
-    else if (q.type === 3) {
-      return (q as any).rows.concat((q as any).columns);
-    }
-  });
-
-  return [
-    tests,
-    attempts,
-    units,
-    unit_results,
-    themes,
-    theme_results,
-    questions,
-    answers,
-    options,
-  ];
-}
-export function split_up(test: DiSpace.Test, attempt: DiSpace.Attempt): [DiSpace.Unit[], DiSpace.UnitResult[], DiSpace.Theme[], DiSpace.ThemeResult[], DiSpace.Question[], DiSpace.Answer[], DiSpace.Option[]] {
-  let units = test.units;
-  let unit_results = attempt.units;
-  let themes = units.flatMap(u => u.themes);
-  let theme_results = unit_results.flatMap(u => u.themes);
-  let questions = themes.flatMap(t => t.questions);
-  let answers = theme_results.flatMap(t => t.answers);
-  let options = questions.flatMap(q => {
-    if (q.type === 1 || q.type === 2 || q.type === 4)
-      return (q as any).options;
-    else if (q.type === 3) {
-      return (q as any).rows.concat((q as any).columns);
-    }
-    else return [];
-  });
-
-  return [
-    units,
-    unit_results,
-    themes,
-    theme_results,
-    questions,
-    answers,
-    options,
-  ];
+export function extract_names(th: Raw.UserTestHistory) : DiSpace.Test[] {
+  let tests: DiSpace.Test[] = [];
+  let ids = Object.keys(th.tests);
+  for (let id of ids) {
+    let info = th.tests[id];
+    if (info.length > 0) tests.push({ id: +info[0].test_id, name: info[0].name, units: undefined });
+  }
+  return tests;
 }

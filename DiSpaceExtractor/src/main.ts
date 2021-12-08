@@ -21,6 +21,17 @@ function convert(results: Raw.GetAttemptAPIResult[]) {
   }
   return data;
 }
+function convert_test_history(results: Raw.GetTestHistoryAPIResult[]) {
+  let data: DiSpace.Test[] = [];
+  for (let result of results) {
+    if ((result as any).error) {
+      // ignoring errors
+      continue;
+    }
+    data.push(...Converter.extract_names(result as any));
+  }
+  return data;
+}
 function transfer(data: [DiSpace.Test, DiSpace.Attempt][]) {
   db.transaction(() => {
     
@@ -63,6 +74,16 @@ function transfer(data: [DiSpace.Test, DiSpace.Attempt][]) {
 
   })();
 }
+function transfer_test_history(data: DiSpace.Test[]) {
+  db.transaction(() => {
+    for (let test of data) {
+      let old_test = writer.getTest(test.id, false);
+      if (old_test.name != test.name) {
+        writer.setTest(test);
+      }
+    }
+  });
+}
 function benchmark<T>(name: string, fn: () => T): T {
   let start = console.time(name);
   let res;
@@ -75,6 +96,7 @@ function benchmark<T>(name: string, fn: () => T): T {
   console.timeEnd(name);
   return res;
 }
+const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 const options: SQLite.Options = {};
 // options.verbose = console.log;
@@ -95,16 +117,14 @@ for (let f of inFiles) {
 throw new Error("Done!");
 */
 
-let nameRegex = /(\d+)-(\d+)\.json/;
-inFiles = inFiles.filter(f => nameRegex.test(f)).sort((a, b) => {
-  let m1 = nameRegex.exec(a);
-  let m2 = nameRegex.exec(b);
-  return +m1[1] - +m2[2];
-});
+async function doAttempts() {
+  let nameRegex = /(\d+)-(\d+)\.json/;
 
-const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
-
-(async () => {
+  inFiles = inFiles.filter(f => nameRegex.test(f)).sort((a, b) => {
+    let m1 = nameRegex.exec(a);
+    let m2 = nameRegex.exec(b);
+    return +m1[1] - +m2[1];
+  });
 
   for (let inFile of inFiles) {
   
@@ -113,33 +133,52 @@ const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
     if (match == null) continue;
     let start = +match[1];
     let end = +match[2];
-  
-    if ((start % 100000) == 1) {
-      console.log(`Passed ${start - 1}th mark.`);
-    }
-    else if ((start % 50000) == 1) {
-      console.log(`Passed ${start - 1}th mark.`);
-    }
-    else if ((start % 10000) == 1) {
-      console.log(`Passed ${start - 1}th mark.`);
-    }
-    else if ((start % 5000) == 1) {
-      console.log(`Passed ${start - 1}th mark.`);
-    }
     // if ((start % 50000) == 1) benchmark("Vacuuming", () => db.exec("VACUUM;"));
   
     console.log(`Working with ${inFile}`);
-    let json = JSON.parse(fs.readFileSync(path) as any);
   
-    let converted = benchmark("Convert", () => convert(json as Raw.GetAttemptAPIResult[]));
+    let converted = benchmark("Convert", () => convert(JSON.parse(fs.readFileSync(path) as any) as Raw.GetAttemptAPIResult[]));
     benchmark("Transfer", () => transfer(converted));
   
     let renamedPath = `${inDir}\\done.${start}_${end}.json`;
     fs.renameSync(path, renamedPath);
-
-    // await sleep(3000);
-  
   }
+}
+
+async function doTestHistories() {
+  let nameRegex = /(\d+)-(\d+)\.th\.json/;
+
+  inFiles = inFiles.filter(f => nameRegex.test(f)).sort((a, b) => {
+    let m1 = nameRegex.exec(a);
+    let m2 = nameRegex.exec(b);
+    return +m1[1] - +m2[1];
+  });
+
+  for (let inFile of inFiles) {
+  
+    let path = `${inDir}\\${inFile}`;
+    let match = nameRegex.exec(inFile);
+    if (match == null) continue;
+    let start = +match[1];
+    let end = +match[2];
+    // if ((start % 50000) == 1) benchmark("Vacuuming", () => db.exec("VACUUM;"));
+  
+    console.log(`Working with ${inFile}`);
+  
+    let converted = benchmark("Convert", () => convert_test_history(JSON.parse(fs.readFileSync(path) as any) as Raw.GetTestHistoryAPIResult[]));
+    benchmark("Transfer", () => transfer_test_history(converted));
+  
+    let renamedPath = `${inDir}\\done.${start}_${end}.th.json`;
+    fs.renameSync(path, renamedPath);
+  }
+}
+
+
+
+(async () => {
+
+  // await doAttempts();
+  await doTestHistories();
 
 })();
 

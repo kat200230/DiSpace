@@ -141,7 +141,7 @@ export type OpenQuestionAnswerInfo = AnswerInfo & {
   response: string,
 }
 
-export type GetTestsAPIResult = { error: string } | UserTestHistory;
+export type GetTestHistoryAPIResult = { error: string } | UserTestHistory;
 
 export type UserTestHistory = {
   tests: {
