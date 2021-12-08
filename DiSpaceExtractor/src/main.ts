@@ -78,11 +78,11 @@ function transfer_test_history(data: DiSpace.Test[]) {
   db.transaction(() => {
     for (let test of data) {
       let old_test = writer.getTest(test.id, false);
-      if (old_test.name != test.name) {
+      if (old_test == null || old_test.name != test.name) {
         writer.setTest(test);
       }
     }
-  });
+  })();
 }
 function benchmark<T>(name: string, fn: () => T): T {
   let start = console.time(name);
@@ -108,11 +108,11 @@ let inDir = "D:\\uni-repos\\DiSpace\\DiSpaceExtractor\\in";
 let inFiles = fs.readdirSync(inDir);
 
 /*
-let r = /done\.(\d+)_(\d+)\.json/;
+let r = /done\.th\.(\d+)-(\d+)\.json/;
 for (let f of inFiles) {
   let match = r.exec(f);
   if (match == null) continue;
-  fs.renameSync(`${inDir}\\${f}`, `${inDir}\\${match[1]}-${match[2]}.json`);
+  fs.renameSync(`${inDir}\\${f}`, `${inDir}\\${match[1]}-${match[2]}.th.json`);
 }
 throw new Error("Done!");
 */

@@ -21,22 +21,27 @@ function unpackString(str: string): string {
 }
 
 const [testParameters, testPlaceholders] = makeParameters([
-  "id"
+  "id",
+  "name",
 ]);
 function packTest(test: DiSpace.Test): DataRow {
   return [
     test.id,
+    test.name,
   ];
 }
 function unpackTest(data: any[]): DiSpace.Test {
   if (data == null) return null;
   return {
     id: data[0],
+    name: data[1],
     units: undefined,
   };
 }
 function diffTest(a: DiSpace.Test, b: DiSpace.Test): Diff[] {
-  return [];
+  let diffs: Diff[] = [];
+  if (a.name !== b.name) diffs.push({ id: b.id, field: 2, old_value: a.name });
+  return diffs;
 }
 
 const [unitParameters, unitPlaceholders] = makeParameters([
