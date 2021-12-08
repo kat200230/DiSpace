@@ -92,7 +92,7 @@ namespace DiSpaceCore
         public DiSpaceAttempt GetLastAttempt()
         {
             if (lastAttempt is not null) return lastAttempt;
-            SQLiteCommand getLastAttempt = new SQLiteCommand("SELECT * FROM attempts ORDER BY id DESC LIMIT 1;", Database);
+            SQLiteCommand getLastAttempt = new SQLiteCommand("SELECT * FROM attempts ORDER BY finished_at DESC LIMIT 1;", Database);
             SQLiteDataReader reader = getLastAttempt.ExecuteReader(CommandBehavior.SingleRow);
             if (!reader.Read()) throw new InvalidOperationException("The attempts table is empty.");
             return lastAttempt = new DiSpaceAttempt(this, reader);
@@ -103,7 +103,7 @@ namespace DiSpaceCore
         public DiSpaceAttempt GetFirstAttempt()
         {
             if (firstAttempt is not null) return firstAttempt;
-            SQLiteCommand getFirstAttempt = new SQLiteCommand("SELECT * FROM attempts ORDER BY id ASC LIMIT 1;", Database);
+            SQLiteCommand getFirstAttempt = new SQLiteCommand("SELECT * FROM attempts ORDER BY started_at ASC LIMIT 1;", Database);
             SQLiteDataReader reader = getFirstAttempt.ExecuteReader(CommandBehavior.SingleRow);
             if (!reader.Read()) throw new InvalidOperationException("The attempts table is empty.");
             return firstAttempt = new DiSpaceAttempt(this, reader);
