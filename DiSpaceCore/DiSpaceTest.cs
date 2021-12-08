@@ -11,8 +11,10 @@ namespace DiSpaceCore
             Client = client;
 
             Id = record.GetSqliteInt32(0);
+            Name = record.GetSqliteTextOrNull(1);
         }
         public int Id { get; }
+		public string? Name { get; }
 
         private DiSpaceUnit[]? units;
         public IReadOnlyList<DiSpaceUnit> Units => units ??= Client.GetUnitsInternal(Id);

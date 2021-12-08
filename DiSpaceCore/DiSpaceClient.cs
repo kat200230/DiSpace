@@ -211,6 +211,15 @@ namespace DiSpaceCore
             return list.ToArray();
         }
 
+        public DiSpaceTest[] SearchTests(string likePattern)
+        {
+            SQLiteCommand searchThemes = new SQLiteCommand($"SELECT * FROM tests WHERE name LIKE @like;", Database);
+            searchThemes.Parameters.Add("@like", DbType.String).Value = likePattern;
+            SQLiteDataReader reader = searchThemes.ExecuteReader();
+            List<DiSpaceTest> list = new List<DiSpaceTest>();
+            while (reader.Read()) list.Add(new DiSpaceTest(this, reader));
+            return list.ToArray();
+        }
 
 
 
