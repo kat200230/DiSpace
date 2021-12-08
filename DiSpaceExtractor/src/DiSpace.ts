@@ -2,6 +2,7 @@
 
 export type Test = {
   id: number, // pk
+  name?: string,
   units: Unit[],
 }
 export type Attempt = {
@@ -186,7 +187,6 @@ export type OpenQuestionAnswer = Answer & {
   response: string,
   // type: 6,
 }
-
 
 
 

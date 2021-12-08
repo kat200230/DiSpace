@@ -140,3 +140,23 @@ export type OpenQuestionAnswerInfo = AnswerInfo & {
   type: "8",
   response: string,
 }
+
+export type GetTestsAPIResult = { error: string } | UserTestHistory;
+
+export type UserTestHistory = {
+  tests: {
+    [test_id: string]: UserTestInfo[],
+  },
+}
+export type UserTestInfo = {
+  test_id: string,
+  score_id: string,
+  test_start: string,
+  test_end: string,
+  test_status: string,
+  num_of_opened_questions: string,
+  score: string,
+  max_score: string,
+  mode: string,
+  name: string,
+}
