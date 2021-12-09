@@ -1,14 +1,18 @@
 ﻿using System;
+using System.Data.Entity.ModelConfiguration.Conventions;
 using System.Data.SQLite;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Reflection.Metadata.Ecma335;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Serialization;
 using DiSpaceCore;
 using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
+using Emzi0767;
 using static System.Net.Mime.MediaTypeNames;
 
 namespace DiPeek
@@ -108,8 +112,7 @@ namespace DiPeek
                                 "**`test <ID> txt`** - вытягивает данные о тесте с этим ID в текстовый файл.",
                                 "**`test search <term>`** - ищет тесты по названию.",
                                 "**`theme search <term>`** - ищет темы с заданным запросом в названии (P.S.: не у всех тем выставлены названия).",
-                                "**`question search <term>`** - то же самое что и команда выше, но выводит вопросы вместо отдельных тем.",
-                                "**`question <ID>`** - показывает инфу о вопросе с этим ID.",
+                                "**`question <ID>`** - показывает инфу об открытом вопросе с этим ID.",
                                 "Введите команду без аргументов для более подробной информации.");
             }
             else if (e.MatchCommand("test", "t"))
@@ -129,32 +132,41 @@ namespace DiPeek
                         return;
                     }
                     string term = e.NextArgument()!;
-                    if (term.Length < 3)
+                    while (e.HasNextArgument) term += $" {e.NextArgument()}";
+                    if (term.Length < 2)
                     {
-                        await e.Respond("Слишком короткий запрос. Введите как минимум 3 символа.");
+                        await e.Respond("Слишком короткий запрос. Введите как минимум 2 символа.");
+                        return;
+                    }
+                    if (term.Length > 50)
+                    {
+                        await e.Respond("Слишком длинный запрос. Ввести можно максимум 50 символов.");
                         return;
                     }
                     DiSpaceTest[] tests = DiSpace.SearchTests(term);
                     if (tests.Length == 0)
                     {
-                        await e.Respond("Не удалось ничего найти.");
+                        string resp = "**Не удалось ничего найти.**\nМожете попробовать ввести корень ключевого слова";
+                        if (term.Contains(' ')) resp += " или оставить только одно из слов в запросе";
+                        await e.Respond(resp + ".");
                         return;
                     }
                     StringBuilder sb = new StringBuilder();
-                    sb.Append("Извлечено с помощью DiPeek: https://discord.gg/tphsh9vsty");
-                    string title = $"|========== ПОИСК ПО ВОПРОСАМ С ТЕМАМИ '{term}' ==========|";
+                    AppendNotice(sb);
+                    string title = $"|========== ПОИСК ПО ТЕСТАМ С '{term}' ==========|";
                     sb.Append("\n" + new string('=', title.Length));
                     sb.Append("\n" + title);
                     sb.Append("\n" + new string('=', title.Length));
+                    sb.Append('\n');
 
                     foreach (DiSpaceTest test2 in tests)
                     {
                         sb.Append($"\n===== Тест \"{test2.Name}\" (ID: {test2.Id}) =====");
                     }
 
-                    sb.Append("\n\nИзвлечено с помощью DiPeek: https://discord.gg/tphsh9vsty");
-                    string text2 = sb.ToString();
-                    await e.RespondFile("test_search.txt", text2);
+                    sb.Append('\n', 2);
+                    AppendNotice(sb);
+                    await e.RespondFile("test_search.txt", sb.ToString());
                     return;
 
                 }
@@ -166,8 +178,8 @@ namespace DiPeek
                 }
                 if (!DiSpace.TryGetTest(testId, out DiSpaceTest? test))
                 {
-                    await e.Respond($"Не удалось найти тест с ID {testId} в срезе"
-                                  + $"[{DiSpace.GetFirstAttempt().StartedAt:yyyy/MM/dd}-{DiSpace.GetLastAttempt().StartedAt:yyyy/MM/dd}].",
+                    await e.Respond($"Не удалось найти тест с ID {testId} в срезе "
+                                  + $"[{DiSpace.GetFirstAttempt().StartedAt:yyyy/MM/dd} - {DiSpace.GetLastAttempt().StartedAt:yyyy/MM/dd}].",
                                     "Что может быть не так:",
 									"- Вы ввели что-то не то; *(позже сделаю дополнительную проверку тут)*",
                                     "- Ещё никто не проходил этот тест, либо результаты были стёрты;",
@@ -179,108 +191,21 @@ namespace DiPeek
                 if (!e.HasNextArgument)
                 {
                     StringBuilder sb = new StringBuilder();
-                    sb.Append($"Тест \"{test.Name}\" (ID: {test.Id}):");
-                    foreach (DiSpaceUnit unit in test.Units)
-                    {
-                        sb.Append($"\n--- Раздел \"{unit.Name ?? "*(без названия)*"}\" (Hash: {unit.Hash}");
-                        if (unit.IsShuffled) sb.Append(", вперемешку");
-                        sb.Append("):");
-                        if (!string.IsNullOrWhiteSpace(unit.Description)) sb.Append($"\n--- {CleanString(unit.Description).Limit(100)}.");
-
-                        foreach (DiSpaceTheme theme in unit.Themes)
-                        {
-                            sb.Append($"\n--- --- Тема \"{theme.Name ?? "*(без названия)*"}\" (Hash: {theme.Hash}");
-                            if (theme.IsShuffled) sb.Append(", вперемешку");
-                            sb.Append("):");
-                            if (!string.IsNullOrWhiteSpace(theme.Description)) sb.Append($"\n--- --- {CleanString(theme.Description).Limit(100)}.");
-
-                            sb.Append($"\n--- --- --- {theme.Questions.Count} вопросов.");
-                        }
-                    }
-                    await e.Respond(sb.ToString().Limit(2000));
+                    sb.Append($"\nПРИМЕЧАНИЕ: Используйте /test {test.Id} txt для вывода ответов.\n\n");
+                    AppendNotice(sb);
+                    AppendTestStructure(sb, test);
+                    AppendNotice(sb);
+                    await e.RespondFile($"test_{test.Id}_contents.txt", sb.ToString());
+                    return;
                 }
-				else if (e.MatchArgument("text", "txt"))
+                else if (e.MatchArgument("text", "txt"))
                 {
                     StringBuilder sb = new StringBuilder();
-                    sb.Append("Извлечено с помощью DiPeek: https://discord.gg/tphsh9vsty");
-                    string title = $"|========== ТЕСТ \"{test.Name}\" (ID: {test.Id}) ==========|";
-                    sb.Append("\n" + new string('=', title.Length));
-                    sb.Append("\n" + title);
-                    sb.Append("\n" + new string('=', title.Length));
+                    AppendNotice(sb);
+                    AppendTest(sb, test);
+                    AppendNotice(sb);
 
-                    foreach (DiSpaceUnit unit in test.Units)
-                    {
-                        sb.Append($"\n\n========== РАЗДЕЛ ");
-                        if (unit.Name is not null) sb.Append($"\"{unit.Name}\" ");
-                        sb.Append($"(Хэш: {unit.Hash}");
-                        if (unit.IsShuffled) sb.Append(", вперемешку");
-                        sb.Append(") ==========");
-                        if (unit.Description is not null) sb.Append($"\n--- {unit.Description}.");
-
-                        foreach (DiSpaceTheme theme in unit.Themes)
-                        {
-                            sb.Append($"\n\n===== Тема ");
-                            if (theme.Name is not null) sb.Append($"\"{theme.Name}\" ");
-                            sb.Append($"(Хэш: {theme.Hash}");
-                            if (theme.IsShuffled) sb.Append(", вперемешку");
-                            sb.Append(") =====");
-                            if (theme.Description is not null) sb.Append($"\n--- {theme.Description}.");
-
-                            if (theme.Questions.Count > 0) sb.Append('\n');
-                            int i = 0;
-                            foreach (DiSpaceQuestion question in theme.Questions)
-                            {
-                                string maxStr = question.MaxScore.HasValue ? question.MaxScore.GetValueOrDefault().ToString("N2") : "???";
-                                sb.Append($"\n\n{++i}. \"{question.Title}\" (макс. {maxStr} б.): {CleanString(question.Prompt)}");
-
-                                if (question is DiSpaceSimpleQuestion simple)
-                                {
-                                    sb.Append($"\nОтвет: {string.Join("; ", simple.Correct.Select(static o => CleanString(o.Text)))}");
-                                }
-								else if (question is DiSpacePairQuestion pair)
-                                {
-                                    sb.Append($"\nОтвет: {string.Join("; ", pair.Correct.Select(static c => $"{CleanString(c.A.Text)} <> {CleanString(c.B.Text)}"))}");
-                                }
-								else if (question is DiSpaceAssociativeQuestion associative)
-                                {
-                                    sb.Append($"\nОтвет: {string.Join("; ", associative.Correct.Select(static c => $"{CleanString(c.Row.Text)} : {CleanString(c.Column.Text)}"))}");
-                                }
-								else if (question is DiSpaceOrderQuestion order)
-                                {
-                                    sb.Append($"\nОтвет: {string.Join("; ", order.Options.Select(static o => CleanString(o.Text)))}");
-                                }
-								else if (question is DiSpaceCustomInputQuestion customInput)
-                                {
-                                    sb.Append($"\nОтвет: {string.Join("; ", customInput.Correct.Select(static p => $"`{p.Pattern}`"))}");
-                                }
-								else if (question is DiSpaceOpenQuestion open)
-                                {
-                                    // sb.Append($"\nУдачи с этим пока что. Функция просмотра чужих ответов будет добавлена позже.");
-                                    DiSpaceOpenQuestionAnswer[] answers = DiSpace.GetAnswersByQuestion(question.Id)
-                                                                                 .OfType<DiSpaceOpenQuestionAnswer>().ToArray();
-                                    sb.Append($"\nОтвет: используйте /question {open.Id} для просмотра {answers.Length} ответов.");
-                                    sb.Append($"\n{answers.Count(a => a.Score > 0f)}/{answers.Length} оцененных.");
-                                    sb.Append($"\n{answers.Count(a => !string.IsNullOrWhiteSpace(a.Response))}/{answers.Length} непустых.");
-                                }
-
-                            }
-
-                        }
-                    }
-
-                    sb.Append("\n\nИзвлечено с помощью DiPeek: https://discord.gg/tphsh9vsty");
-
-                    string text = sb.ToString();
-
-                    DiscordMessageBuilder dmb = new DiscordMessageBuilder();
-
-                    MemoryStream stream = new MemoryStream();
-                    stream.Write(Encoding.UTF8.GetBytes(text));
-                    stream.Seek(0, SeekOrigin.Begin);
-                    dmb.WithFile($"test_{test.Id}.txt", stream);
-                    await e.Channel.SendMessageAsync(dmb);
-                    await stream.DisposeAsync();
-
+                    await e.RespondFile($"test_{test.Id}.txt", sb.ToString());
                 }
 
             }
@@ -291,98 +216,63 @@ namespace DiPeek
                     await e.Respond("Используйте эту команду с айди открытых вопросов.");
                     return;
                 }
-                if (e.MatchArgument("search", "s"))
+                if (!e.MatchNumberArgument(out int questionId))
                 {
-                    if (!e.HasNextArgument)
-                    {
-                        await e.Respond("Вы ничего не ввели. Введите запрос для поиска.");
-                        return;
-                    }
-                    string term = e.NextArgument()!;
-                    if (term.Length < 5)
-                    {
-                        await e.Respond("Слишком короткий запрос. Введите как минимум 5 символов.");
-                        return;
-                    }
-                    DiSpaceQuestion[] questions = DiSpace.SearchQuestionsByThemeName($"%{term}%");
-                    if (questions.Length == 0)
+                    await e.Respond($"Не удалось распознать `{e.PeekArgument().Limit(20)}` как число.",
+                                    "Предлагаю следующее решение: введите число. 😉");
+                    return;
+                }
+                if (!DiSpace.TryGetQuestion(questionId, out DiSpaceQuestion? qu))
+                {
+                    await e.Respond("Не удалось найти вопрос с введённым айди.");
+                    return;
+                }
+
+                if (qu.Type is DiSpaceQuestionType.OpenQuestion)
+                {
+                    DiSpaceOpenQuestionAnswer[] answers = DiSpace.GetAnswersByQuestion(questionId).OfType<DiSpaceOpenQuestionAnswer>().ToArray();
+                    if (answers.Length == 0)
                     {
                         await e.Respond("Не удалось ничего найти.");
                         return;
                     }
+                    DiSpaceOpenQuestion question = answers[0].Question;
 
                     StringBuilder sb = new StringBuilder();
-                    sb.Append("Извлечено с помощью DiPeek: https://discord.gg/tphsh9vsty");
-                    string title = $"|========== ПОИСК ПО ВОПРОСАМ С ТЕМАМИ '{term}' ==========|";
+                    AppendNotice(sb);
+                    string title = $"|========== ВОПРОС (ID: {questionId}) ==========|";
                     sb.Append("\n" + new string('=', title.Length));
                     sb.Append("\n" + title);
                     sb.Append("\n" + new string('=', title.Length));
-                    foreach (DiSpaceQuestion question in questions)
-                    {
-							string maxStr = question.MaxScore.HasValue ? question.MaxScore.GetValueOrDefault().ToString("N2") : "???";
-                                sb.Append($"\n\n\"{question.Title}\" (макс. {maxStr} б.):\n{CleanString(question.Prompt)}");
 
-                                if (question is DiSpaceSimpleQuestion simple)
-                                {
-                                    sb.Append($"\nОтвет: {string.Join("; ", simple.Correct.Select(static o => CleanString(o.Text)))}");
-                                }
-								else if (question is DiSpacePairQuestion pair)
-                                {
-                                    sb.Append($"\nОтвет: {string.Join("; ", pair.Correct.Select(static c => $"{CleanString(c.A.Text)} <> {CleanString(c.B.Text)}"))}");
-                                }
-								else if (question is DiSpaceAssociativeQuestion associative)
-                                {
-                                    sb.Append($"\nОтвет: {string.Join("; ", associative.Correct.Select(static c => $"{CleanString(c.Row.Text)} : {CleanString(c.Column.Text)}"))}");
-                                }
-								else if (question is DiSpaceOrderQuestion order)
-                                {
-                                    sb.Append($"\nОтвет: {string.Join("; ", order.Options.Select(static o => CleanString(o.Text)))}");
-                                }
-								else if (question is DiSpaceCustomInputQuestion customInput)
-                                {
-                                    sb.Append($"\nОтвет: {string.Join("; ", customInput.Correct.Select(static p => $"`{p.Pattern}`"))}");
-                                }
-								else if (question is DiSpaceOpenQuestion open)
-                                {
-                                    // sb.Append($"\nУдачи с этим пока что. Функция просмотра чужих ответов будет добавлена позже.");
-                                    DiSpaceOpenQuestionAnswer[] answers = DiSpace.GetAnswersByQuestion(question.Id)
-                                                                                 .OfType<DiSpaceOpenQuestionAnswer>().ToArray();
-                                    sb.Append($"\nОтвет: используйте /question {open.Id} для просмотра {answers.Length} ответов.");
-                                    sb.Append($"\n{answers.Count(a => a.Score > 0f)}/{answers.Length} оцененных.");
-                                    sb.Append($"\n{answers.Count(a => !string.IsNullOrWhiteSpace(a.Response))}/{answers.Length} непустых.");
-                                }
+                    sb.Append($"\n\n{question.Prompt.Clean()}\n");
+
+                    foreach (DiSpaceOpenQuestionAnswer answer in answers.OrderByDescending(static a => a.Score))
+                    {
+                        string response = answer.Response;
+                        if (string.IsNullOrWhiteSpace(response)) continue;
+                        string maxStr = question.MaxScore.HasValue ? question.MaxScore.GetValueOrDefault().ToString("N2") : "???";
+                        sb.Append($"\n\n===== {answer.Score:N2}/{maxStr} | Ответ из попытки с ID: {answer.AttemptId} ====\n\n");
+
+                        sb.Append(response.Replace("\n\n", "\n"));
                     }
 
-                    sb.Append("\n\nИзвлечено с помощью DiPeek: https://discord.gg/tphsh9vsty");
-                    string text2 = sb.ToString();
-                    await e.RespondFile("question_search.txt", text2);
+                    sb.Append('\n', 2);
+                    AppendNotice(sb);
 
-                    return;
+                    await e.RespondFile($"question_{questionId}.txt", sb.ToString());
                 }
                 else
                 {
-                    if (!e.MatchNumberArgument(out int questionId))
-                    {
-                        await e.Respond("Не удалось распознать то что вы ввели как число.");
-                        return;
-                    }
-                    if (!DiSpace.TryGetQuestion(questionId, out DiSpaceQuestion? qu))
-                    {
-                        await e.Respond("Не удалось найти вопрос с введённым айди.");
-                        return;
-                    }
-
-                    if (qu.Type != DiSpaceQuestionType.OpenQuestion)
-                    {
-                        StringBuilder sb = new StringBuilder();
+					StringBuilder sb = new StringBuilder();
 						string maxStr = qu.MaxScore.HasValue ? qu.MaxScore.GetValueOrDefault().ToString("N2") : "???";
-                        sb.Append($"**\"{qu.Title}\" (макс. {maxStr} б.)**:\n{CleanString(qu.Prompt)}");
+                        sb.Append($"**\"{qu.Title}\" (макс. {maxStr} б.)**:\n{qu.Prompt.Clean()}");
 
                         if (qu is DiSpaceSimpleQuestion simple)
                         {
                             foreach (DiSpaceSimpleOption option in simple.Options)
                             {
-                                string opt = $"- {CleanString(option.Text)} - ({option.Score:N2} б.)";
+                                string opt = $"- {option.Text.Clean()} - ({option.Score:N2} б.)";
                                 opt = option.IsCorrect ? $"**{opt} - правильный ответ**" : $"*{opt}*";
                                 sb.Append("\n" + opt);
                             }
@@ -390,28 +280,28 @@ namespace DiPeek
                         else if (qu is DiSpacePairQuestion pair)
                         {
                             foreach (DiSpacePairOption pairOption in pair.Options)
-                                sb.Append($"\n- {CleanString(pairOption.Text)}");
+                                sb.Append($"\n- {pairOption.Text.Clean()}");
                             sb.Append("\n\n**Правильные соотношения:**");
                             foreach (Pair<DiSpacePairOption> p in pair.Correct)
-                                sb.Append($"\n**- {CleanString(p.A.Text)} <=> {CleanString(p.B.Text)}**;");
+                                sb.Append($"\n**- {p.A.Text.Clean()} <=> {p.B.Text.Clean()}**;");
                         }
                         else if (qu is DiSpaceAssociativeQuestion associative)
                         {
                             sb.Append("\nСтроки:");
                             foreach (DiSpaceAssociativeRow row in associative.Rows)
-                                sb.Append($"\n- {CleanString(row.Text)}");
+                                sb.Append($"\n- {row.Text.Clean()}");
                             sb.Append("\nСтолбцы:");
                             foreach (DiSpaceAssociativeColumn column in associative.Columns)
-                                sb.Append($"\n- {CleanString(column.Text)}");
+                                sb.Append($"\n- {column.Text.Clean()}");
                             sb.Append("\n\n**Правильные соотношения:**");
                             foreach (DiSpaceAssociativeChoice p in associative.Correct)
-                                sb.Append($"\n**- {CleanString(p.Row.Text)} <=> {CleanString(p.Column.Text)}**;");
+                                sb.Append($"\n**- {p.Row.Text.Clean()} <=> {p.Column.Text.Clean()}**;");
                         }
                         else if (qu is DiSpaceOrderQuestion order)
                         {
                             sb.Append($"**\n\nПравильный порядок:**");
                             foreach (DiSpaceOrderOption option in order.Options)
-                                sb.Append($"\n**{CleanString(option.Text)}**;");
+                                sb.Append($"\n**{option.Text.Clean()}**;");
                         }
                         else if (qu is DiSpaceCustomInputQuestion customInput)
                         {
@@ -421,51 +311,8 @@ namespace DiPeek
                         }
 
                         string text = sb.ToString();
-                        if (text.Length < 2000) await e.Respond(text);
+                        if (text.Length < 1000) await e.Respond(text);
                         else await e.RespondFile($"answer_{questionId}.txt", text);
-
-                    }
-                    else
-                    {
-                        DiSpaceOpenQuestionAnswer[] answers = DiSpace.GetAnswersByQuestion(questionId).OfType<DiSpaceOpenQuestionAnswer>().ToArray();
-                        if (answers.Length == 0)
-                        {
-                            await e.Respond("Не удалось ничего найти.");
-                            return;
-                        }
-                        DiSpaceOpenQuestion question = answers[0].Question;
-
-                        StringBuilder sb = new StringBuilder();
-                        sb.Append("Извлечено с помощью DiPeek: https://discord.gg/tphsh9vsty");
-                        string title = $"|========== ВОПРОС (ID: {questionId}) ==========|";
-                        sb.Append("\n" + new string('=', title.Length));
-                        sb.Append("\n" + title);
-                        sb.Append("\n" + new string('=', title.Length));
-
-                        foreach (DiSpaceOpenQuestionAnswer answer in answers.OrderByDescending(static a => a.Score))
-                        {
-                            string response = answer.Response;
-                            if (string.IsNullOrWhiteSpace(response)) continue;
-                            string maxStr = question.MaxScore.HasValue ? question.MaxScore.GetValueOrDefault().ToString("N2") : "???";
-                            sb.Append($"\n\n===== {answer.Score:N2}/{maxStr} | Ответ из попытки с ID: {answer.AttemptId} ====\n\n");
-
-                            sb.Append(response.Replace("\n\n", "\n"));
-                        }
-
-                        sb.Append("\n\nИзвлечено с помощью DiPeek: https://discord.gg/tphsh9vsty");
-
-                        string text = sb.ToString();
-
-                        DiscordMessageBuilder dmb = new DiscordMessageBuilder();
-
-                        MemoryStream stream = new MemoryStream();
-                        stream.Write(Encoding.UTF8.GetBytes(text));
-                        stream.Seek(0, SeekOrigin.Begin);
-                        dmb.WithFile($"question_{questionId}.txt", stream);
-                        await e.Channel.SendMessageAsync(dmb);
-                        await stream.DisposeAsync();
-                        return;
-                    }
                 }
 
 
@@ -480,9 +327,15 @@ namespace DiPeek
                         return;
                     }
                     string term = e.NextArgument()!;
+                    while (e.HasNextArgument) term += $" {e.NextArgument()}";
                     if (term.Length < 3)
                     {
                         await e.Respond("Слишком короткий запрос. Введите как минимум 3 символа.");
+                        return;
+                    }
+                    if (term.Length > 50)
+                    {
+                        await e.Respond("Слишком длинный запрос. Ввести можно максимум 50 символов.");
                         return;
                     }
                     DiSpaceTheme[] themes = DiSpace.SearchThemes($"%{term}%");
@@ -504,23 +357,208 @@ namespace DiPeek
             }
         }
 
-        public static string CleanString(string str)
+        public string GetVersion()
         {
-            RemoveFromString(ref str, "<div>", "</div>");
-            RemoveFromString(ref str, "<p>", "</p>");
-            RemoveFromString(ref str, "<span>", "</span>");
-            RemoveFromString(ref str, "<em>", "</em>");
-            RemoveFromString(ref str, "<strong>", "</strong>");
-            RemoveFromString(ref str, "<br>", "<br/>");
-            str = str.Replace("&nbsp;", " ");
-            str = str.Replace("\n\n", "\n");
-            return str.Trim();
+            DiSpaceAttempt last = DiSpace.GetLastAttempt();
+            return $"v{last.Id}, {last.StartedAt:d MMMM yyyy}";
         }
-        private static void RemoveFromString(ref string str, params string[] remove)
+
+        public void AppendNotice(StringBuilder sb)
         {
-            foreach (string part in remove)
-                str = str.Replace(part, string.Empty);
+            sb.Append("Извлечено с помощью DiPeek: https://discord.gg/tphsh9vsty\n");
         }
+
+        public void AppendTest(StringBuilder sb, DiSpaceTest test, bool cascade = true)
+        {
+            if (cascade)
+            {
+                StringBuilder tb = new StringBuilder();
+                tb.Append("||||| ТЕСТ ");
+                if (test.Name is null) tb.Append("(название неизвестно)");
+                else tb.Append('"').Append(test.Name.Clean()).Append('"');
+                tb.Append($" (ID: {test.Id}) |||||");
+
+                sb.Append('=', tb.Length);
+                sb.Append('\n').Append(tb.ToString());
+                sb.Append('\n').Append('=', tb.Length).Append('\n', 2);
+
+                if (test.Units.Count is 0)
+                {
+                    sb.Append("Тест пустой. Неожиданно.\n");
+                    sb.Append("Единственное объяснение, которое приходит в голову - это то, что составитель загрузил пустой файл.\n");
+                    sb.Append("Это также означает, что никто и не проходил этот тест. Вообщем, смотрите другие тесты. Этот - пустышка.").Append('\n', 2);
+                }
+                foreach (DiSpaceUnit unit in test.Units)
+                    AppendUnit(sb, unit);
+            }
+            else
+            {
+                sb.Append("===== ТЕСТ ");
+                if (test.Name is null) sb.Append("(название неизвестно)");
+                else sb.Append('"').Append(test.Name.Clean()).Append('"');
+                sb.Append($" (ID: {test.Id}) =====").Append('\n', 2);
+            }
+        }
+        public void AppendUnit(StringBuilder sb, DiSpaceUnit unit, bool cascade = true)
+        {
+            sb.Append("===== РАЗДЕЛ ");
+            if (unit.Name is null) sb.Append("(без названия)");
+            else sb.Append('"').Append(unit.Name.Clean()).Append('"');
+            sb.Append($" (Хэш: {unit.Hash}");
+            if (unit.IsShuffled) sb.Append(", ВПЕРЕМЕШКУ");
+            sb.Append(") =====");
+            if (unit.Description is not null)
+                sb.Append('\n').Append(unit.Description.Clean());
+            sb.Append('\n', 2);
+
+            if (cascade)
+            {
+                foreach (DiSpaceTheme theme in unit.Themes)
+                    AppendTheme(sb, theme);
+            }
+        }
+        public void AppendTheme(StringBuilder sb, DiSpaceTheme theme, bool cascade = true)
+        {
+            sb.Append("===== Тема ");
+            if (theme.Name is null) sb.Append("(без названия)");
+            else sb.Append('"').Append(theme.Name.Clean()).Append('"');
+            sb.Append($" (Хэш: {theme.Hash}");
+            if (theme.IsShuffled) sb.Append(", ВПЕРЕМЕШКУ");
+            sb.Append(") =====");
+            if (theme.Description is not null)
+                sb.Append('\n').Append(theme.Description.Clean());
+            sb.Append('\n', 2);
+
+            if (cascade)
+            {
+                foreach (DiSpaceQuestion question in theme.Questions)
+                    AppendQuestion(sb, question);
+            }
+        }
+        public void AppendQuestion(StringBuilder sb, DiSpaceQuestion question)
+        {
+            string maxStr = question.MaxScore.HasValue ? question.MaxScore.GetValueOrDefault().ToString("N2") : "???";
+            sb.Append($"- Вопрос \"{question.Title.Clean()}\" (макс. {maxStr} б.):\n- {question.Prompt.Clean()}");
+
+            if (question is DiSpaceSimpleQuestion simple)
+            {
+                int count = simple.Correct.Count;
+                sb.Append(count is 1 ? "\nПравильный ответ:" : "\nПравильные ответы:");
+                if (count is 1)
+                {
+                    sb.Append($"\n- {simple.Correct[0].Text.Clean()}.");
+                }
+				else
+                    for (int i = 0; i < count; i++)
+                    {
+                        sb.Append($"\n- {simple.Correct[i].Text.Clean()}");
+                        sb.Append(i + 1 == count ? '.' : ';');
+                    }
+            }
+            else if (question is DiSpacePairQuestion pair)
+            {
+                int count = pair.Correct.Count;
+                sb.Append("\nПравильные пары:");
+                for (int i = 0; i < count; i++)
+                {
+                    Pair<DiSpacePairOption> c = pair.Correct[i];
+                    sb.Append($"\n- {c.A.Text.Clean()} <=> {c.B.Text.Clean()};");
+                    sb.Append(i + 1 == count ? '.' : ';');
+                }
+            }
+            else if (question is DiSpaceAssociativeQuestion associative)
+            {
+                int count = associative.Correct.Count;
+                sb.Append("\nПравильные ассоциации:");
+                for (int i = 0; i < count; i++)
+                {
+                    DiSpaceAssociativeChoice c = associative.Correct[i];
+                    sb.Append($"\n- {c.Row.Text.Clean()} <=> {c.Column.Text.Clean()}");
+                    sb.Append(i + 1 == count ? '.' : ';');
+                }
+            }
+            else if (question is DiSpaceOrderQuestion order)
+            {
+                sb.Append("\nПравильный порядок:");
+                List<DiSpaceOrderOption> options = order.Options.ToList();
+                options.Sort(static (a, b) => a.CorrectIndex.CompareTo(b.CorrectIndex));
+                for (int i = 0; i < options.Count; i++)
+                {
+                    sb.Append($"\n{i + 1}. {options[i].Text.Clean()}");
+                    sb.Append(i + 1 == options.Count ? '.' : ';');
+                }
+
+            }
+            else if (question is DiSpaceCustomInputQuestion customInput)
+            {
+                int count = customInput.Correct.Count;
+                sb.Append(count is 1 ? "\nШаблон правильного ответа:" : "\nШаблоны правильных ответов:");
+                List<DiSpaceCustomInputPattern> patterns = customInput.Correct.ToList();
+                patterns.Sort(static (a, b) => -a.Score.CompareTo(b.Score));
+                for (int i = 0; i < count; i++)
+                {
+                    DiSpaceCustomInputPattern pattern = customInput.Correct[i];
+                    sb.Append($"\n- `{pattern.Pattern}` ({(pattern.Score > 0 ? "+" : "-")}{Math.Abs(pattern.Score)} б.)");
+                    sb.Append(i + 1 == count ? '.' : ';');
+                }
+
+            }
+            else if (question is DiSpaceOpenQuestion open)
+            {
+                DiSpaceOpenQuestionAnswer[] answers = DiSpace.GetAnswersByQuestion(question.Id)
+                                                             .OfType<DiSpaceOpenQuestionAnswer>().ToArray();
+                if (answers.Length is 0)
+                {
+                    sb.Append($"\nНедоступно ни одного ответа. ({GetVersion()})");
+                    return;
+                }
+                sb.Append($"\nОтвет: используйте /question {open.Id} для просмотра {answers.Length} ответов.");
+                sb.Append($"\n{answers.Count(static a => a.Score > 0f)}/{answers.Length} оцененных.");
+                sb.Append($"\n{answers.Count(static a => !string.IsNullOrWhiteSpace(a.Response))}/{answers.Length} непустых.");
+            }
+            sb.Append('\n', 2);
+        }
+
+        public void AppendTestStructure(StringBuilder sb, DiSpaceTest test)
+        {
+            StringBuilder tb = new StringBuilder();
+            tb.Append("||||| ТЕСТ ");
+            if (test.Name is null) tb.Append("(название неизвестно)");
+            else tb.Append('"').Append(test.Name.Clean()).Append('"');
+            tb.Append($" (ID: {test.Id}) |||||");
+
+            sb.Append('=', tb.Length);
+            sb.Append('\n').Append(tb.ToString());
+            sb.Append('\n').Append('=', tb.Length).Append('\n', 3);
+
+            if (test.Units.Count is 0)
+            {
+                sb.Append("Тест пустой. Неожиданно.\n");
+                sb.Append("Единственное объяснение, которое приходит в голову - это то, что составитель загрузил пустой файл.\n");
+                sb.Append("Это также означает, что никто и не проходил этот тест. Вообщем, смотрите другие тесты. Этот - пустышка.").Append('\n', 2);
+            }
+            foreach (DiSpaceUnit unit in test.Units)
+            {
+                sb.Append("\n===== РАЗДЕЛ ");
+                if (unit.Name is null) sb.Append("(без названия)");
+                else sb.Append('"').Append(unit.Name.Clean()).Append('"');
+                sb.Append($" (Хэш: {unit.Hash}) =====").Append('\n', 2);
+                if (unit.Description is not null)
+                    sb.Append('\n').Append(unit.Description.Clean());
+
+                foreach (DiSpaceTheme theme in unit.Themes)
+                {
+                    sb.Append("\n- Тема ");
+                    if (theme.Name is null) sb.Append("(без названия)");
+                    else sb.Append('"').Append(theme.Name.Clean()).Append('"');
+                    sb.Append($" (Хэш: {theme.Hash}, {theme.Questions.Count} вопросов)").Append('\n');
+                    if (theme.Description is not null)
+                        sb.Append('\n').Append(theme.Description.Clean());
+                }
+            }
+            sb.Append('\n', 2);
+        }
+
     }
     public class BotConfig
     {
@@ -604,6 +642,30 @@ namespace DiPeek
         {
             if (str is null) return string.Empty;
 			return str.Length <= maxLength ? str : str[..(maxLength - 1)] + "…";
+        }
+        private static readonly Regex imgRegex = new Regex("<img.*?src=\"(.+?)\".*?/?>");
+        private static readonly Regex garbageRegex = new Regex("<(?:span|sup|style).*?/?>");
+        public static string Clean(this string? str)
+        {
+            if (str is null) return string.Empty;
+            RemoveFromString(ref str, "<div>", "</div>");
+            RemoveFromString(ref str, "<p>", "</p>");
+            RemoveFromString(ref str, "<span>", "</span>");
+            RemoveFromString(ref str, "<sup>", "</sup>");
+            RemoveFromString(ref str, "<style>", "</style>");
+            RemoveFromString(ref str, "<em>", "</em>");
+            RemoveFromString(ref str, "<strong>", "</strong>");
+            RemoveFromString(ref str, "<br>", "<br/>");
+            str = str.Replace("&nbsp;", " ");
+            str = str.Replace("\n", " ");
+            str = imgRegex.Replace(str, "https://dispace.edu.nstu.ru/$1");
+            str = garbageRegex.Replace(str, string.Empty);
+            return str.Trim();
+        }
+        private static void RemoveFromString(ref string str, params string[] remove)
+        {
+            foreach (string part in remove)
+                str = str.Replace(part, string.Empty);
         }
     }
 }
