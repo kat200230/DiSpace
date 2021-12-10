@@ -658,7 +658,7 @@ namespace DiPeek
             RemoveFromString(ref str, "<br>", "<br/>");
             str = str.Replace("&nbsp;", " ");
             str = str.Replace("\n", " ");
-            str = imgRegex.Replace(str, "https://dispace.edu.nstu.ru/$1");
+            str = imgRegex.Replace(str, " https://dispace.edu.nstu.ru/$1 ");
             str = garbageRegex.Replace(str, string.Empty);
             return str.Trim();
         }
