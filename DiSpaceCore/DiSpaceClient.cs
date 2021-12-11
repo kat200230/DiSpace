@@ -99,7 +99,7 @@ namespace DiSpaceCore
         public DiSpaceAttempt GetLastAttempt()
         {
             if (lastAttempt is not null) return lastAttempt;
-            SQLiteCommand getLastAttempt = new SQLiteCommand("SELECT * FROM attempts ORDER BY finished_at DESC LIMIT 1;", Database);
+            SQLiteCommand getLastAttempt = new SQLiteCommand("SELECT * FROM attempts ORDER BY started_at DESC LIMIT 1;", Database);
             SQLiteDataReader reader = getLastAttempt.ExecuteReader(CommandBehavior.SingleRow);
             if (!reader.Read()) throw new InvalidOperationException("The attempts table is empty.");
             return lastAttempt = new DiSpaceAttempt(this, reader);
@@ -228,6 +228,21 @@ namespace DiSpaceCore
             return list.ToArray();
         }
 
+        public DiSpaceAttempt[] GetAttemptsByTestId(int testId)
+        {
+            SQLiteCommand getAttempts = new SQLiteCommand("SELECT * FROM attempts WHERE test_id = @test_id;", Database);
+            getAttempts.Parameters.Add("@test_id", DbType.Int32).Value = testId;
+            SQLiteDataReader reader = getAttempts.ExecuteReader();
+            List<DiSpaceAttempt> list = new List<DiSpaceAttempt>();
+            while (reader.Read())
+            {
+                int id = reader.GetSqliteInt32(0);
+                if (!attempts.TryGetValue(id, out DiSpaceAttempt? attempt))
+                    attempt = new DiSpaceAttempt(this, reader);
+                list.Add(attempt);
+            }
+            return list.ToArray();
+        }
 
 
     }
@@ -242,6 +257,8 @@ namespace DiSpaceCore
         public static int? GetSqliteInt32OrNull(this IDataRecord record, int field) => record.IsDBNull(field) ? null : (int)record.GetInt64(field);
         public static DateTimeOffset GetSqliteDateTime(this IDataRecord record, int field)
             => DateTimeOffset.FromUnixTimeSeconds(record.GetInt64(field));
+        public static DateTimeOffset? GetSqliteDateTimeOrNull(this IDataRecord record, int field)
+            => record.IsDBNull(field) ? null : DateTimeOffset.FromUnixTimeSeconds(record.GetInt64(field));
         public static string GetSqliteText(this IDataRecord record, int field) => record.GetString(field);
         public static string? GetSqliteTextOrNull(this IDataRecord record, int field) => record.IsDBNull(field) ? null : record.GetString(field);
         public static bool GetSqliteBoolean(this IDataRecord record, int field) => record.GetInt64(field) is 1;

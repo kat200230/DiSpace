@@ -113,7 +113,12 @@ namespace DiPeek
                                 "**`test search <term>`** - ищет тесты по названию.",
                                 "**`theme search <term>`** - ищет темы с заданным запросом в названии (P.S.: не у всех тем выставлены названия).",
                                 "**`question <ID>`** - показывает инфу об открытом вопросе с этим ID.",
+								"**`version`** - показывает версию и дату последнего обновления базы данных.",
                                 "Введите команду без аргументов для более подробной информации.");
+            }
+			else if (e.MatchCommand("version", "v"))
+            {
+                await e.Respond($"Текущая версия DiPeek:\n{GetVersion()}");
             }
             else if (e.MatchCommand("test", "t"))
             {
@@ -182,8 +187,9 @@ namespace DiPeek
                                   + $"[{DiSpace.GetFirstAttempt().StartedAt:yyyy/MM/dd} - {DiSpace.GetLastAttempt().StartedAt:yyyy/MM/dd}].",
                                     "Что может быть не так:",
 									"- Вы ввели что-то не то; *(позже сделаю дополнительную проверку тут)*",
-                                    "- Ещё никто не проходил этот тест, либо результаты были стёрты;",
+                                    "- Ещё никто не проходил этот тест, либо результаты были подтёрты;",
                                     "- Тесту больше 13 лет, или же он очень свежий;",
+                                    "- Тест был переайдирован, в таком случае ищите по названию;",
                                     $"Последняя запись в БД датируется: **{DiSpace.GetLastAttempt().StartedAt:yyyy/MM/dd hh:mm:ss}**.");
                     return;
                 }
@@ -191,7 +197,13 @@ namespace DiPeek
                 if (!e.HasNextArgument)
                 {
                     StringBuilder sb = new StringBuilder();
-                    sb.Append($"\nПРИМЕЧАНИЕ: Используйте /test {test.Id} txt для вывода ответов.\n\n");
+                    sb.Append($"ПРИМЕЧАНИЕ: Используйте \"/test {test.Id}\" txt для вывода ответов.\n\n");
+                    sb.Append($"Зарегистрированных попыток: {test.Attempts.Count}.").Append('\n');
+                    if (test.Attempts.Count < 5)
+                    {
+                        sb.Append("!!! ПРЕДУПРЕЖДЕНИЕ: Попыток мало, и некоторые вопросы могли быть не раскрыты.").Append('\n');
+                        sb.Append("!!! Это также применимо и ко всем другим тестам, но тут будьте особенно осторожны.").Append('\n', 2);
+                    }
                     AppendNotice(sb);
                     AppendTestStructure(sb, test);
                     AppendNotice(sb);
@@ -201,6 +213,12 @@ namespace DiPeek
                 else if (e.MatchArgument("text", "txt"))
                 {
                     StringBuilder sb = new StringBuilder();
+                    sb.Append($"Зарегистрированных попыток: {test.Attempts.Count}.").Append('\n');
+                    if (test.Attempts.Count < 5)
+                    {
+                        sb.Append("!!! ПРЕДУПРЕЖДЕНИЕ: Попыток мало, и некоторые вопросы могли быть не раскрыты.").Append('\n');
+                        sb.Append("!!! Это также применимо и ко всем другим тестам, но тут будьте особенно осторожны.").Append('\n', 2);
+                    }
                     AppendNotice(sb);
                     AppendTest(sb, test);
                     AppendNotice(sb);
@@ -266,7 +284,7 @@ namespace DiPeek
                 {
 					StringBuilder sb = new StringBuilder();
 						string maxStr = qu.MaxScore.HasValue ? qu.MaxScore.GetValueOrDefault().ToString("N2") : "???";
-                        sb.Append($"**\"{qu.Title}\" (макс. {maxStr} б.)**:\n{qu.Prompt.Clean()}");
+                        sb.Append($"**\"{qu.Title}\" (макс. {maxStr} б.)**:\n{qu.Prompt.Clean().Limit(600)}");
 
                         if (qu is DiSpaceSimpleQuestion simple)
                         {
@@ -311,7 +329,7 @@ namespace DiPeek
                         }
 
                         string text = sb.ToString();
-                        if (text.Length < 1000) await e.Respond(text);
+                        if (text.Length < 1500) await e.Respond(text);
                         else await e.RespondFile($"answer_{questionId}.txt", text);
                 }
 

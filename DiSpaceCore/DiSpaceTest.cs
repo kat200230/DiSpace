@@ -18,5 +18,8 @@ namespace DiSpaceCore
 
         private DiSpaceUnit[]? units;
         public IReadOnlyList<DiSpaceUnit> Units => units ??= Client.GetUnitsInternal(Id);
+
+        private DiSpaceAttempt[]? attempts;
+        public IReadOnlyList<DiSpaceAttempt> Attempts => attempts ??= Client.GetAttemptsByTestId(Id);
     }
 }
