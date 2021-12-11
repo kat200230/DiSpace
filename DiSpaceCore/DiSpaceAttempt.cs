@@ -15,7 +15,7 @@ namespace DiSpaceCore
             TestId = record.GetSqliteInt32(1);
             UserId = record.GetSqliteInt32(2);
             StartedAt = record.GetSqliteDateTime(3);
-            FinishedAt = record.GetSqliteDateTime(4);
+            FinishedAt = record.GetSqliteDateTimeOrNull(4);
             Score = record.GetSqliteFloat(5);
             MaxScore = record.GetSqliteFloat(6);
             ShowResultsMode = record.GetSqliteText(7);
