@@ -108,11 +108,11 @@ let inDir = "D:\\uni-repos\\DiSpace\\DiSpaceExtractor\\in";
 let inFiles = fs.readdirSync(inDir);
 
 /*
-let r = /done\.th\.(\d+)-(\d+)\.json/;
+let r = /th\.done\.(\d+)-(\d+)\.json/;
 for (let f of inFiles) {
   let match = r.exec(f);
   if (match == null) continue;
-  fs.renameSync(`${inDir}\\${f}`, `${inDir}\\${match[1]}-${match[2]}.th.json`);
+  fs.renameSync(`${inDir}\\${f}`, `th.${inDir}\\${match[1]}-${match[2]}.json`);
 }
 throw new Error("Done!");
 */
@@ -146,7 +146,7 @@ async function doAttempts() {
 }
 
 async function doTestHistories() {
-  let nameRegex = /(\d+)-(\d+)\.th\.json/;
+  let nameRegex = /th\.(\d+)-(\d+)\.json/;
 
   inFiles = inFiles.filter(f => nameRegex.test(f)).sort((a, b) => {
     let m1 = nameRegex.exec(a);
@@ -168,7 +168,7 @@ async function doTestHistories() {
     let converted = benchmark("Convert", () => convert_test_history(JSON.parse(fs.readFileSync(path) as any) as Raw.GetTestHistoryAPIResult[]));
     benchmark("Transfer", () => transfer_test_history(converted));
   
-    let renamedPath = `${inDir}\\done.${start}_${end}.th.json`;
+    let renamedPath = `${inDir}\\th.done.${start}_${end}.json`;
     fs.renameSync(path, renamedPath);
   }
 }
@@ -177,8 +177,8 @@ async function doTestHistories() {
 
 (async () => {
 
-  // await doAttempts();
-  await doTestHistories();
+  await doAttempts();
+  // await doTestHistories();
 
 })();
 

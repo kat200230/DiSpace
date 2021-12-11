@@ -169,8 +169,8 @@ async function sinkTestHistory(from, to, eachN = 100, chunkSize = 100, delaySeco
         cxt.arr = [];
         cxt.start = null;
 
-        addButton(`${myStart}-${end}.th`, async (button) => {
-          await writeFile(`${myStart}-${end}.th.json`, mySlice);
+        addButton(`th.${myStart}-${end}`, async (button) => {
+          await writeFile(`th.${myStart}-${end}.json`, mySlice);
           button.remove();
         });
       }
