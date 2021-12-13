@@ -166,7 +166,7 @@ namespace DiPeek
 
                     foreach (DiSpaceTest test2 in tests)
                     {
-                        sb.Append($"\n===== Тест \"{test2.Name}\" (ID: {test2.Id}) =====");
+                        sb.Append($"\n===== Тест \"{test2.Name}\" (ID: {test2.Id}, прохождений: {test2.Attempts.Count}) =====");
                     }
 
                     sb.Append('\n', 2);
@@ -282,15 +282,15 @@ namespace DiPeek
                 }
                 else
                 {
-					StringBuilder sb = new StringBuilder();
-						string maxStr = qu.MaxScore.HasValue ? qu.MaxScore.GetValueOrDefault().ToString("N2") : "???";
+                    StringBuilder sb = new StringBuilder();
+                    string maxStr = qu.MaxScore.HasValue ? qu.MaxScore.GetValueOrDefault().ToString("N2") : "???";
                         sb.Append($"**\"{qu.Title}\" (макс. {maxStr} б.)**:\n{qu.Prompt.Clean().Limit(600)}");
 
                         if (qu is DiSpaceSimpleQuestion simple)
                         {
                             foreach (DiSpaceSimpleOption option in simple.Options)
                             {
-                                string opt = $"- {option.Text.Clean()} - ({option.Score:N2} б.)";
+                                string opt = $"- {option.Text.Clean()}";
                                 opt = option.IsCorrect ? $"**{opt} - правильный ответ**" : $"*{opt}*";
                                 sb.Append("\n" + opt);
                             }
@@ -670,6 +670,7 @@ namespace DiPeek
             RemoveFromString(ref str, "<p>", "</p>");
             RemoveFromString(ref str, "<span>", "</span>");
             RemoveFromString(ref str, "<sup>", "</sup>");
+            RemoveFromString(ref str, "<sub>", "</sub>");
             RemoveFromString(ref str, "<style>", "</style>");
             RemoveFromString(ref str, "<em>", "</em>");
             RemoveFromString(ref str, "<strong>", "</strong>");
