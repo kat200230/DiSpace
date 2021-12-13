@@ -668,16 +668,16 @@ namespace DiPeek
 			return str.Length <= maxLength ? str : str[..(maxLength - 1)] + "…";
         }
         private static readonly Regex imgRegex = new Regex("<img.*?src=\"(.+?)\".*?/?>");
-        private static readonly Regex garbageRegex = new Regex("<(?:span|sup|style).*?/?>");
+        private static readonly Regex garbageRegex = new Regex("<(?:p|span|sup|sub|style).*?/?>");
         public static string Clean(this string? str)
         {
             if (str is null) return string.Empty;
             RemoveFromString(ref str, "<div>", "</div>");
-            RemoveFromString(ref str, "<p>", "</p>");
-            RemoveFromString(ref str, "<span>", "</span>");
-            RemoveFromString(ref str, "<sup>", "</sup>");
-            RemoveFromString(ref str, "<sub>", "</sub>");
-            RemoveFromString(ref str, "<style>", "</style>");
+            RemoveFromString(ref str, "</p>");
+            RemoveFromString(ref str, "</span>");
+            RemoveFromString(ref str, "</sup>");
+            RemoveFromString(ref str, "</sub>");
+            RemoveFromString(ref str, "</style>");
             RemoveFromString(ref str, "<em>", "</em>");
             RemoveFromString(ref str, "<strong>", "</strong>");
             RemoveFromString(ref str, "<br>", "<br/>");
