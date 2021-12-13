@@ -41,7 +41,7 @@ export default function Home() {
   return (
     <Layout
       title={`${siteConfig.title}`}
-      description="This website template is amazing!">
+      description="Крупнейшая база данных тестов DiSpace.">
       <HomepageHeader/>
       <main>
         <HomepageFeatures/>
