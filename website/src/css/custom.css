@@ -16,6 +16,19 @@
   padding: 0 var(--ifm-pre-padding);
 }
 
+.menu__list .menu__list .menu__link {
+  color: var(--ifm-font-color-base);
+  font-weight: 400;
+  font-size: 14px;
+  padding: 3px 12px;
+}
+
+.row .col.col--8 {
+  flex: 1 1;
+  max-width: inherit;
+  margin-left: 15%;
+}
+
 .header-github-link:hover {
   opacity: 0.6;
 }
@@ -39,8 +52,23 @@ html[data-theme='dark'] .header-github-link:before {
     max-width: inherit !important;
   }
 }
-.row .col.col--8 {
-  flex: 1 1;
-  max-width: inherit;
-  margin-left: 15%;
+
+.discord-message .discord-message-content {
+  width: calc(100% - 65px) !important;
+}
+.discord-message {
+  font-size: 1em !important;
+}
+.discord-messages {
+  font-family: 'Whitney',"Helvetica Neue",Helvetica,Arial,sans-serif !important;
+}
+
+@font-face {
+  font-family: 'Whitney';
+  src: local('Whitney/Whitney Book'), local('Whitney/Whitney-Book'),
+      url('Whitney/Whitney-Book.woff2') format('woff2'),
+      url('Whitney/Whitney-Book.woff') format('woff'),
+      url('Whitney/Whitney-Book.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
 }
