@@ -15,6 +15,7 @@ module.exports = {
       theme: require('prism-react-renderer/themes/dracula'),
       additionalLanguages: ['clike', 'csharp', 'bash'],
     },
+    image: 'img/logo.png',
     announcementBar: {
       id: 'star',
       content:
