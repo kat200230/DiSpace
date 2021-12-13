@@ -325,7 +325,13 @@ namespace DiPeek
                         {
                             sb.Append("**\n\nШаблоны правильных ответов:**");
                             foreach (DiSpaceCustomInputPattern pattern in customInput.Correct)
-                                sb.Append($"\n**- `{pattern.Pattern}` ({pattern.Score:N2} б.)**;");
+                            {
+                                sb.Append('\n');
+                                if (pattern.Score > 0) sb.Append("**");
+                                sb.Append($"- `{pattern.Pattern}` ({(pattern.Score > 0 ? "+" : "–")}{Math.Abs(pattern.Score):N2} б.)");
+                                if (pattern.Score > 0) sb.Append("**");
+                                sb.Append(';');
+                            }
                         }
 
                         string text = sb.ToString();
@@ -516,7 +522,7 @@ namespace DiPeek
                 for (int i = 0; i < count; i++)
                 {
                     DiSpaceCustomInputPattern pattern = customInput.Correct[i];
-                    sb.Append($"\n- `{pattern.Pattern}` ({(pattern.Score > 0 ? "+" : "-")}{Math.Abs(pattern.Score)} б.)");
+                    sb.Append($"\n- `{pattern.Pattern}` ({(pattern.Score > 0 ? "+" : "–")}{Math.Abs(pattern.Score)} б.)");
                     sb.Append(i + 1 == count ? '.' : ';');
                 }
 
