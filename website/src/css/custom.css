@@ -55,6 +55,7 @@ html[data-theme='dark'] .header-github-link:before {
 
 .discord-message .discord-message-content {
   width: calc(100% - 65px) !important;
+  line-height: 140% !important;
 }
 .discord-message {
   font-size: 1em !important;
@@ -62,13 +63,31 @@ html[data-theme='dark'] .header-github-link:before {
 .discord-messages {
   font-family: 'Whitney',"Helvetica Neue",Helvetica,Arial,sans-serif !important;
 }
+.discord-message p {
+  margin-bottom: 0 !important;
+}
+.discord-message b {
+  font-family: 'Whitney Bold',"Helvetica Neue",Helvetica,Arial,sans-serif !important;
+}
+.discord-message strong {
+  font-family: 'Whitney Bold',"Helvetica Neue",Helvetica,Arial,sans-serif !important;
+}
 
 @font-face {
   font-family: 'Whitney';
-  src: local('Whitney/Whitney Book'), local('Whitney/Whitney-Book'),
+  src: local('Whitney/Book'), local('Whitney/Whitney-Book'),
       url('Whitney/Whitney-Book.woff2') format('woff2'),
       url('Whitney/Whitney-Book.woff') format('woff'),
       url('Whitney/Whitney-Book.ttf') format('truetype');
   font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Whitney Bold';
+  src: local('Whitney/Whitney Bold'), local('Whitney/Whitney-Bold'),
+      url('Whitney/Whitney-Bold.woff2') format('woff2'),
+      url('Whitney/Whitney-Bold.woff') format('woff'),
+      url('Whitney/Whitney-Bold.ttf') format('truetype');
+  font-weight: 700;
   font-style: normal;
 }
