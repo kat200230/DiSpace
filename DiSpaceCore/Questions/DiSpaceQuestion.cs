@@ -31,6 +31,9 @@ namespace DiSpaceCore
         public DiSpaceQuestionTypeOriginal TypeOriginal { get; }
         public DiSpaceQuestionType Type { get; }
 
+        private DiSpaceTheme? theme;
+        public DiSpaceTheme Theme => theme ??= Client.GetTheme(ThemeId);
+
         public static DiSpaceQuestion Resolve(DiSpaceClient client, IDataRecord record)
             => (DiSpaceQuestionType)record.GetSqliteInt32(7) switch
             {

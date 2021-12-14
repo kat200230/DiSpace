@@ -76,7 +76,15 @@ namespace DiPeek
         {
             await Task.WhenAll(DiSpace.ConnectAsync(),
                                Discord.ConnectAsync());
+            logsChannel = await Discord.GetChannelAsync(920325118402637864UL);
         }
+        private DiscordChannel logsChannel;
+        public async Task Log(string text)
+        {
+            await logsChannel.SendMessageAsync($"```\n{text}\n```");
+        }
+        public async Task Log(DiscordUser author, string text)
+            => Log($"{author.Username}#{author.Discriminator} {text}");
 
         private Task DiscordOnMessageCreated(DiscordClient sender, MessageCreateEventArgs e)
         {
@@ -107,6 +115,7 @@ namespace DiPeek
         {
             if (e.MatchCommand("help", "h", "?"))
             {
+                await e.Channel.TriggerTypingAsync();
                 await e.Respond("**`help` - список команд DiPeek:**",
                                 "**`test <ID>`** - показывает инфу о тесте с этим ID.",
                                 "**`test <ID> txt`** - вытягивает данные о тесте с этим ID в текстовый файл.",
@@ -118,10 +127,12 @@ namespace DiPeek
             }
 			else if (e.MatchCommand("version", "v"))
             {
+                await e.Channel.TriggerTypingAsync();
                 await e.Respond($"Текущая версия DiPeek:\n{GetVersion()}");
             }
             else if (e.MatchCommand("test", "t"))
             {
+                await e.Channel.TriggerTypingAsync();
                 if (!e.HasNextArgument || e.MatchArgument("help", "h", "?"))
                 {
                     await e.Respond("**Команда `test`:**",
@@ -172,6 +183,7 @@ namespace DiPeek
                     sb.Append('\n', 2);
                     AppendNotice(sb);
                     await e.RespondFile("test_search.txt", sb.ToString());
+                    await Log(e.Author, $"нашёл {tests.Length} тестов (\"{term}\")");
                     return;
 
                 }
@@ -224,11 +236,13 @@ namespace DiPeek
                     AppendNotice(sb);
 
                     await e.RespondFile($"test_{test.Id}.txt", sb.ToString());
+                    await Log(e.Author, $"получил все ответы на тест \"{test.Name}\" ({test.Id})");
                 }
 
             }
 			else if (e.MatchCommand("question", "qu"))
             {
+                await e.Channel.TriggerTypingAsync();
                 if (!e.HasNextArgument)
                 {
                     await e.Respond("Используйте эту команду с айди открытых вопросов.");
@@ -279,6 +293,8 @@ namespace DiPeek
                     AppendNotice(sb);
 
                     await e.RespondFile($"question_{questionId}.txt", sb.ToString());
+                    DiSpaceTest test = question.Theme.Unit.Test;
+                    await Log(e.Author, $"получил ответ из теста \"{test.Name}\" ({test.Id}/{question.Id})");
                 }
                 else
                 {
@@ -318,13 +334,13 @@ namespace DiPeek
                         else if (qu is DiSpaceOrderQuestion order)
                         {
                             sb.Append($"**\n\nПравильный порядок:**");
-                            foreach (DiSpaceOrderOption option in order.Options)
+                            foreach (DiSpaceOrderOption option in order.Options.OrderBy(static o => o.CorrectIndex))
                                 sb.Append($"\n**{option.Text.Clean()}**;");
                         }
                         else if (qu is DiSpaceCustomInputQuestion customInput)
                         {
                             sb.Append("**\n\nШаблоны правильных ответов:**");
-                            foreach (DiSpaceCustomInputPattern pattern in customInput.Correct)
+                            foreach (DiSpaceCustomInputPattern pattern in customInput.Correct.OrderByDescending(static p => p.Score))
                             {
                                 sb.Append('\n');
                                 if (pattern.Score > 0) sb.Append("**");
@@ -337,12 +353,15 @@ namespace DiPeek
                         string text = sb.ToString();
                         if (text.Length < 1500) await e.Respond(text);
                         else await e.RespondFile($"answer_{questionId}.txt", text);
+                        DiSpaceTest test = qu.Theme.Unit.Test;
+                        await Log(e.Author, $"получил ответ из теста \"{test.Name}\" ({test.Id}/{qu.Id})");
                 }
 
 
             }
 			else if (e.MatchCommand("theme", "th"))
             {
+                await e.Channel.TriggerTypingAsync();
                 if (e.MatchArgument("search", "s"))
                 {
                     if (!e.HasNextArgument)

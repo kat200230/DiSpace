@@ -32,5 +32,8 @@ namespace DiSpaceCore
 
         private DiSpaceTheme[]? themes;
         public IReadOnlyList<DiSpaceTheme> Themes => themes ??= Client.GetThemesInternal(Id);
+
+        private DiSpaceTest? test;
+        public DiSpaceTest Test => test ??= Client.GetTest(TestId);
     }
 }
