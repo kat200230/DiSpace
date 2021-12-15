@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net5.0</TargetFramework>
@@ -6,7 +6,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Data.SQLite" Version="1.0.115.5" />
+    <PackageReference Include="MultiTarget.Microsoft.Data.Sqlite" Version="2.1.1" />
+    <PackageReference Include="MultiTarget.Microsoft.Data.Sqlite.Core" Version="2.1.1" />
   </ItemGroup>
 
 </Project>

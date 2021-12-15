@@ -1,19 +1,18 @@
 ﻿using System;
-using System.Data.Entity.ModelConfiguration.Conventions;
-using System.Data.SQLite;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.IO;
 using System.Linq;
-using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Serialization;
 using DiSpaceCore;
 using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
-using Emzi0767;
-using static System.Net.Mime.MediaTypeNames;
+using Microsoft.Data.Sqlite;
 
 namespace DiPeek
 {
@@ -36,7 +35,7 @@ namespace DiPeek
             string dbPath = FindInParents("dispace.sqlite");
             string configPath = FindInParents("config.xml");
 
-            using (SQLiteConnection connection = new SQLiteConnection($"Data Source={dbPath};Version=3;FailIfMissing=True"))
+            using (SqliteConnection connection = new SqliteConnection($"Data Source={dbPath};Version=3;FailIfMissing=True"))
             {
                 DiSpaceClient dispace = new DiSpaceClient(connection);
 
@@ -90,7 +89,7 @@ namespace DiPeek
         {
             Task.Run(async () =>
             {
-                if (e.Channel.IsPrivate) return;
+                if (e.Channel.IsPrivate || !e.Channel.Name.Contains("🕵")) return;
                 string[] args = e.Message.Content.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                 if (args.Length > 0)
                 {
