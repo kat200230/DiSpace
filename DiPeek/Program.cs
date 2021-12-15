@@ -35,7 +35,7 @@ namespace DiPeek
             string dbPath = FindInParents("dispace.sqlite");
             string configPath = FindInParents("config.xml");
 
-            using (SqliteConnection connection = new SqliteConnection($"Data Source={dbPath};Version=3;FailIfMissing=True"))
+            using (SqliteConnection connection = new SqliteConnection($"Data Source={dbPath}"))
             {
                 DiSpaceClient dispace = new DiSpaceClient(connection);
 
@@ -77,12 +77,10 @@ namespace DiPeek
                                Discord.ConnectAsync());
             logsChannel = await Discord.GetChannelAsync(920325118402637864UL);
         }
-        private DiscordChannel logsChannel;
-        public async Task Log(string text)
-        {
-            await logsChannel.SendMessageAsync($"```\n{text}\n```");
-        }
-        public async Task Log(DiscordUser author, string text)
+        private DiscordChannel logsChannel = null!;
+        public Task Log(string text)
+            => logsChannel.SendMessageAsync($"```\n{text}\n```");
+        public Task Log(DiscordUser author, string text)
             => Log($"{author.Username}#{author.Discriminator} {text}");
 
         private Task DiscordOnMessageCreated(DiscordClient sender, MessageCreateEventArgs e)
