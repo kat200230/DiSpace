@@ -100,11 +100,11 @@ const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 const options: SQLite.Options = {};
 // options.verbose = console.log;
-let db = new SQLite("D:\\uni-repos\\DiSpace\\dispace.sqlite", options);
+let db = new SQLite("../dispace.sqlite", options);
 
 let writer = new Writer(db);
 
-let inDir = "D:\\uni-repos\\DiSpace\\DiSpaceExtractor\\in";
+let inDir = "./in";
 let inFiles = fs.readdirSync(inDir);
 
 /*
@@ -128,7 +128,7 @@ async function doAttempts() {
 
   for (let inFile of inFiles) {
   
-    let path = `${inDir}\\${inFile}`;
+    let path = `${inDir}/${inFile}`;
     let match = nameRegex.exec(inFile);
     if (match == null) continue;
     let start = +match[1];
@@ -140,7 +140,7 @@ async function doAttempts() {
     let converted = benchmark("Convert", () => convert(JSON.parse(fs.readFileSync(path) as any) as Raw.GetAttemptAPIResult[]));
     benchmark("Transfer", () => transfer(converted));
   
-    let renamedPath = `${inDir}\\done.${start}_${end}.json`;
+    let renamedPath = `${inDir}/done.${start}_${end}.json`;
     fs.renameSync(path, renamedPath);
   }
 }
@@ -156,7 +156,7 @@ async function doTestHistories() {
 
   for (let inFile of inFiles) {
   
-    let path = `${inDir}\\${inFile}`;
+    let path = `${inDir}/${inFile}`;
     let match = nameRegex.exec(inFile);
     if (match == null) continue;
     let start = +match[1];
@@ -168,7 +168,7 @@ async function doTestHistories() {
     let converted = benchmark("Convert", () => convert_test_history(JSON.parse(fs.readFileSync(path) as any) as Raw.GetTestHistoryAPIResult[]));
     benchmark("Transfer", () => transfer_test_history(converted));
   
-    let renamedPath = `${inDir}\\th.done.${start}_${end}.json`;
+    let renamedPath = `${inDir}/th.done.${start}_${end}.json`;
     fs.renameSync(path, renamedPath);
   }
 }

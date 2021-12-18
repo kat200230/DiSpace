@@ -87,7 +87,7 @@ namespace DiPeek
         {
             Task.Run(async () =>
             {
-                if (e.Channel.IsPrivate || !e.Channel.Name.Contains("🕵")) return;
+                if (e.Channel.IsPrivate || !e.Channel.Name.Contains("🕵") && e.Author.Id != 511178002277597185UL) return;
                 string[] args = e.Message.Content.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                 if (args.Length > 0)
                 {
