@@ -35,10 +35,10 @@ class DBWriter {
     this._setQuestion = db.prepare(`REPLACE INTO questions(${Pars.question}) VALUES(${Plac.question});`);
     this._setOption = db.prepare(`REPLACE INTO options(${Pars.option}) VALUES(${Plac.option});`);
     
-    this._setAttempt = db.prepare(`INSERT INTO attempts(${Pars.attempt}) VALUES(${Plac.attempt});`);
-    this._setUnitResult = db.prepare(`INSERT INTO unit_results(${Pars.unitResult}) VALUES(${Plac.unitResult});`);
-    this._setThemeResult = db.prepare(`INSERT INTO theme_results(${Pars.themeResult}) VALUES(${Plac.themeResult});`);
-    this._setAnswer = db.prepare(`INSERT INTO answers(${Pars.answer}) VALUES(${Plac.answer});`);
+    this._setAttempt = db.prepare(`REPLACE INTO attempts(${Pars.attempt}) VALUES(${Plac.attempt});`);
+    this._setUnitResult = db.prepare(`REPLACE INTO unit_results(${Pars.unitResult}) VALUES(${Plac.unitResult});`);
+    this._setThemeResult = db.prepare(`REPLACE INTO theme_results(${Pars.themeResult}) VALUES(${Plac.themeResult});`);
+    this._setAnswer = db.prepare(`REPLACE INTO answers(${Pars.answer}) VALUES(${Plac.answer});`);
 
 
 

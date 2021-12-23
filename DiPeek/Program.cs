@@ -114,13 +114,26 @@ namespace DiPeek
             {
                 await e.Channel.TriggerTypingAsync();
                 await e.Respond("**`help` - список команд DiPeek:**",
+                                "**`about`** - более подробная информация о самом боте.",
                                 "**`test <ID>`** - показывает инфу о тесте с этим ID.",
-                                "**`test <ID> txt`** - вытягивает данные о тесте с этим ID в текстовый файл.",
+                                "**`test <ID> txt`** - вытягивает данные о тесте с этим ID в текстовый файл. **<временно отключено>**",
                                 "**`test search <term>`** - ищет тесты по названию.",
                                 "**`theme search <term>`** - ищет темы с заданным запросом в названии (P.S.: не у всех тем выставлены названия).",
                                 "**`question <ID>`** - показывает инфу об открытом вопросе с этим ID.",
 								"**`version`** - показывает версию и дату последнего обновления базы данных.",
                                 "Введите команду без аргументов для более подробной информации.");
+            }
+            else if (e.MatchCommand("about", "info"))
+            {
+                await e.Respond("**DiPeek - крупнейшая база данных тестов DiSpace.**",
+                                "Разработан ~~студентами~~ студентом для студентов.",
+                                "",
+                                "**Официальный сайт: https://abbysssal.github.io/DiSpace**",
+                                "Руководство пользователя смотрите на сайте.",
+                                "",
+                                "Логотип основан на логотипе Диспейса. Я какой-то эффект на него поставил, не помню какой.",
+                                "",
+                                "Я хотел ещё что-то тут написать, но забыл.");
             }
 			else if (e.MatchCommand("version", "v"))
             {
@@ -134,8 +147,9 @@ namespace DiPeek
                 {
                     await e.Respond("**Команда `test`:**",
                                     "**`test <ID>`** - показывает инфу о тесте с этим ID.",
-									"**`test <ID> text`** - отправляет файл с ответами на тест. Позже сделаю в MD и HTML форматах.",
-                                    "**`test search <term>`** - ищет тест по названию. Может занять некоторое время.");
+									"**`test <ID> text`** - отправляет файл с ответами на тест. Позже сделаю в MD и HTML форматах. **<временно отключено>**",
+                                    "Примечание: если ничего не выводится, значит бот всё ещё собирает данные. Если бы произошла ошибка, он бы уже давно написал бы.",
+                                    "**`test search <term>`** - ищет тест по названию. Обычно работает шустро.");
                 }
                 if (e.MatchArgument("search"))
                 {
@@ -221,6 +235,42 @@ namespace DiPeek
                 }
                 else if (e.MatchArgument("text", "txt"))
                 {
+                    if (e.Author.Id != 511178002277597185UL && !e.Channel.Name.Contains("🔐"))
+                    {
+                        await e.Respond("Извините, но вывод полного списка ответов на тест на данный момент недоступен. Вы можете воспользоваться поиском ответов на индивидуальные вопросы, но во время прохождения теста: `/question <ID>`. Подробнее: <https://abbysssal.github.io/DiSpace/docs/user/searching-questions>.");
+                        return;
+                    }
+
+                    StringBuilder sb = new StringBuilder();
+                    sb.Append($"Зарегистрированных попыток: {test.Attempts.Count}.").Append('\n');
+                    if (test.Attempts.Count < 5)
+                    {
+                        sb.Append("!!! ПРЕДУПРЕЖДЕНИЕ: Попыток мало, и некоторые вопросы могли быть не раскрыты.").Append('\n');
+                        sb.Append("!!! Это также применимо и ко всем другим тестам, но тут будьте особенно осторожны.").Append('\n', 2);
+                    }
+                    AppendNotice(sb);
+                    AppendTest(sb, test);
+                    AppendNotice(sb);
+
+                    await e.RespondFile($"test_{test.Id}.txt", sb.ToString());
+                    await Log(e.Author, $"получил все ответы на тест \"{test.Name}\" ({test.Id})");
+                }
+                else
+                {
+                    List<int> ids = new List<int>();
+                    while (e.MatchNumberArgument(out int nextInt))
+                        ids.Add(nextInt);
+                    if (!e.MatchArgument("text", "txt"))
+                    {
+                        await e.Respond("Вы выбрали несколько тестов, но указали что с ними надо сделать:\n`txt` - вывод в текстовый файл.");
+                    }
+                    
+                    if (e.Author.Id != 511178002277597185UL && !e.Channel.Name.Contains("🔐"))
+                    {
+                        await e.Respond("Извините, но вывод полного списка ответов на тест на данный момент недоступен. Вы можете воспользоваться поиском ответов на индивидуальные вопросы, но во время прохождения теста: `/question <ID>`. Подробнее: <https://abbysssal.github.io/DiSpace/docs/user/searching-questions>.");
+                        return;
+                    }
+
                     StringBuilder sb = new StringBuilder();
                     sb.Append($"Зарегистрированных попыток: {test.Attempts.Count}.").Append('\n');
                     if (test.Attempts.Count < 5)
@@ -242,7 +292,7 @@ namespace DiPeek
                 await e.Channel.TriggerTypingAsync();
                 if (!e.HasNextArgument)
                 {
-                    await e.Respond("Используйте эту команду с айди открытых вопросов.");
+                    await e.Respond("Используйте эту команду с айди вопроса: `/question <ID>`.");
                     return;
                 }
                 if (!e.MatchNumberArgument(out int questionId))
@@ -610,6 +660,7 @@ namespace DiPeek
         public CommandEventArgs(MessageCreateEventArgs e, string command, IEnumerable<string> arguments)
         {
             E = e;
+            Channel = e.Channel;
             Command = command;
             Arguments = new Queue<string>(arguments);
         }
@@ -659,18 +710,34 @@ namespace DiPeek
         }
 
         private readonly MessageCreateEventArgs E;
-        public DiscordChannel Channel => E.Channel;
+        public DiscordChannel Channel { get; set; }
         public DiscordUser Author => E.Author;
 
-        public Task<DiscordMessage> Respond(params string[] lines) => Channel.SendMessageAsync(string.Join('\n', lines));
-        public async Task<DiscordMessage> RespondFile(string fileName, string text)
+        public Task<DiscordMessage> Respond(params string[] lines) => Respond(Channel, lines);
+        public Task<DiscordMessage> Respond(DiscordMember member, params string[] lines)
+            => member.SendMessageAsync(string.Join('\n', lines));
+        public Task<DiscordMessage> Respond(DiscordChannel channel, params string[] lines)
+            => channel.SendMessageAsync(string.Join('\n', lines));
+        public Task<DiscordMessage> RespondFile(string fileName, string text) => RespondFile(fileName, text, Channel);
+        public async Task<DiscordMessage> RespondFile(string fileName, string text, DiscordChannel channel)
         {
             DiscordMessageBuilder dmb = new DiscordMessageBuilder();
             MemoryStream stream = new MemoryStream();
             stream.Write(Encoding.UTF8.GetBytes(text));
             stream.Seek(0, SeekOrigin.Begin);
             dmb.WithFile(fileName, stream);
-            DiscordMessage msg = await Channel.SendMessageAsync(dmb);
+            DiscordMessage msg = await channel.SendMessageAsync(dmb);
+            await stream.DisposeAsync();
+            return msg;
+        }
+        public async Task<DiscordMessage> RespondFile(string fileName, string text, DiscordMember member)
+        {
+            DiscordMessageBuilder dmb = new DiscordMessageBuilder();
+            MemoryStream stream = new MemoryStream();
+            stream.Write(Encoding.UTF8.GetBytes(text));
+            stream.Seek(0, SeekOrigin.Begin);
+            dmb.WithFile(fileName, stream);
+            DiscordMessage msg = await member.SendMessageAsync(dmb);
             await stream.DisposeAsync();
             return msg;
         }
