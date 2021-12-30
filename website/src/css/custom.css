@@ -16,13 +16,6 @@
   padding: 0 var(--ifm-pre-padding);
 }
 
-.menu__list .menu__list .menu__link {
-  color: var(--ifm-font-color-base);
-  font-weight: 400;
-  font-size: 14px;
-  padding: 3px 12px;
-}
-
 .row .col.col--8 {
   flex: 1 1;
   max-width: inherit;
@@ -62,6 +55,7 @@ html[data-theme='dark'] .header-github-link:before {
 }
 .discord-messages {
   font-family: 'Whitney',"Helvetica Neue",Helvetica,Arial,sans-serif !important;
+  margin-bottom: 1em;
 }
 .discord-message p {
   margin-bottom: 0 !important;

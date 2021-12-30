@@ -1,181 +1,66 @@
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+function dipeek_get(i){
+  return new Promise(r=>$.ajax({
+    type:'POST',url:'/ditest/index/result',
+    data:{action:'get_results_by_test',score_id:i,test_id:39999},
+    dataType:'json',success:d=>r(d),
+    error:(x,s,e)=>r({error:`ExtractionError:${e} (${s})`})
+  }))}
+let _ds,_da;
+function dipeek_cancel(){_ds=1}
+function __dipeek_cur(){
+  if(_da)return _da;let t=sessionStorage._da;
+  if(!t)throw new Error("Попытка не была сохранена!");
+  return _da=JSON.parse(t)}
+function __dipeek_set_cur(a){_da=a;sessionStorage._da=JSON.stringify(a)}
 
-function getAttempt(id) {
-  return new Promise(resolve => {
-    $.ajax({
-      type: 'POST',
-      url: '/ditest/index/result',
-      data: {
-        action: 'get_results_by_test',
-        score_id: id,
-        test_id: 40000
-      },
-      dataType: 'json',
-      success: (data, status, xhr) => resolve(data),
-      error: (xhr, status, err) => {
-        console.log(`ExtractionError: ${err} (${status})`);
-        resolve({ error: `ExtractionError: ${err} (${status})` });
-      },
-    });
-  });
-}
+async function dipeek_search(x,r=100){
+  _ds=0;let h=await dipeek_get(x);_t=0;_tqs=0;
+  if (!h.error&&+h.simple.user_id==+USER_ID){__dipeek_set_cur(h);
+    return console.log(`Удалось найти попытку! (${h.simple.id})`)}
+  for(let i=1;i<=r;i++){
+    if(_ds)return console.log(`Поиск прерван.`);
+    h=await dipeek_get(x+i);
+    if (!h.error&&+h.simple.user_id==+USER_ID){__dipeek_set_cur(h);
+      console.log(`Удалось найти попытку! (${h.simple.id})`);return h}
+    if(_ds)return console.log(`Поиск прерван.`);
+    h=await dipeek_get(x-i);
+    if(!h.error&&+h.simple.user_id==+USER_ID){__dipeek_set_cur(h);
+      console.log(`Удалось найти попытку! (${h.simple.id})`);return h}}
+  console.error(`Не удалось найти попытки у ИДЫ = ${x}!`)}
 
-async function getDate(id) {
-	let i = 0;
-	let max = 20;
-	while (i < max) {
-		let res = await getAttempt(id + i);
-		if (res && !res.error) return res.simple.test_start_time;
-		i++;
-	}
-}
+let _t,_tqs,_tlq;
+async function dipeek_train(x=1000000){
+  console.log(`ПРЕДУПРЕЖДЕНИЕ: Это тренировочная версия скрипта! Ответы тут будут на другой тест.`);
+  await new Promise(resolve => setTimeout(resolve, 5000));
+  _ds=0;let h=await dipeek_get(x);__dipeek_set_cur(h);_t=1;_tqs=[];
+  let us=Object.keys(h.res_array).filter(k=>k!="final_result");
+  for(let ui of us){let u=h.res_array[ui];
+    let ts=Object.keys(u).filter(k=>k!="didact");
+    for(let ti of ts){let t=u[ti];
+      _tqs.push(...Object.keys(t).filter(k=>k!="param"&&k!="result").map(k=>+k))}}
+  return console.log(`Удалось найти попытку! (${h.simple.id})`)}
 
-async function getAttempts(from, to, chunkSize = 100, delaySeconds = 2) {
-  let all = [];
-  let curIndex = from;
-  while (curIndex <= to)
-  {
-    let thisChunkSize = Math.min(chunkSize, to - curIndex + 1);
-    let chunkPromises = [];
-    for (let i = 0; i < thisChunkSize; i++)
-    {
-      let myPromise = getAttempt(curIndex + i);
-      chunkPromises.push(myPromise);
-    }
-    let chunkComplete = await Promise.all(chunkPromises);
-    all.push(...chunkComplete);
-    console.log(`Wrote ${chunkComplete.filter(c => !c.error)}/${thisChunkSize} results (${curIndex}-${curIndex + thisChunkSize - 1})`);
-    curIndex += thisChunkSize;
-    if (curIndex <= to) await sleep(delaySeconds * 1000);
-  }
-  return all;
-}
-async function getAttemptsHandler(from, to, chunkSize = 100, delaySeconds = 2, chunkHandler) {
-  let curIndex = from;
-  while (curIndex <= to)
-  {
-    let thisChunkSize = Math.min(chunkSize, to - curIndex + 1);
-    let chunkPromises = [];
-    for (let i = 0; i < thisChunkSize; i++)
-    {
-      let myPromise = getAttempt(curIndex + i);
-      chunkPromises.push(myPromise);
-    }
-    let chunkComplete = await Promise.all(chunkPromises);
-    await chunkHandler(curIndex, curIndex + thisChunkSize - 1, chunkComplete);
-    curIndex += thisChunkSize;
-    if (curIndex <= to) await sleep(delaySeconds * 1000);
-  }
-}
+const _dtr=/test\/index\/(\d+)/;
+function dipeek_find_test_id(){if(CURRENT_TEST_ID>0)return CURRENT_TEST_ID;
+  let m=_dtr.exec(document.URL);if(!m)throw new Error("Не удалось извлечь айди теста!");return+m[1]}
+const _dqr=/test\/index\/\d+\/(\d+)/;
+function dipeek_find_question_id(){if(QUESTION_ID>0)return QUESTION_ID;
+  let m=_dqr.exec(document.URL);if(!m)throw new Error("Не удалось извлечь айди вопроса!");return+m[1]}
 
-function addButton(text, onclick, clickData) {
-  let parentDiv = document.querySelector("#outer > div.page-container > div.tab-container > nav > div > ul");
-  let button = document.createElement("button", { type: "button" });
-  let label = document.createTextNode(text);
-  button.appendChild(label);
-
-  button = parentDiv.appendChild(button);
-  button.onclick = async () => await onclick(button);
-}
-
-async function writeFile(name, json) {
-  const file = await window.showSaveFilePicker({
-    suggestedName: name,
-  });
-  const writable = await file.createWritable();
-  if (typeof json !== "string") json = JSON.stringify(json);
-  await writable.write(json);
-  await writable.close();
-  console.log(`Wrote data to ${file.name} file.`);
-}
-
-async function sink(from, to, eachN = 10, chunkSize = 100, delaySeconds = 5) {
-  let cxt = { arr: [], start: null };
-  let i = 0;
-  await getAttemptsHandler(
-    from, to, chunkSize, delaySeconds,
-    async (start, end, chunk) => {
-
-      if (!cxt.start) cxt.start = start;
-      cxt.arr.push(...chunk);
-
-      if (++i == eachN) {
-        i = 0;
-        let mySlice = cxt.arr;
-        let myStart = cxt.start;
-        cxt.arr = [];
-        cxt.start = null;
-
-        addButton(`${myStart}-${end}`, async (button) => {
-          await writeFile(`${myStart}-${end}.json`, mySlice);
-          button.remove();
-        });
-      }
-
-    });
-}
-
-function getTestHistory(id) {
-  return new Promise(resolve => {
-    $.ajax({
-      type: 'POST',
-      url: '/ditest/index/result',
-      data: {
-        action: 'get_results_by_student',
-        user_id: id,
-		discipline_id: 'all',
-      },
-      dataType: 'json',
-      success: (data, status, xhr) => resolve(data),
-      error: (xhr, status, err) => {
-        console.log(`ExtractionError: ${err} (${status})`);
-        resolve({ error: `ExtractionError: ${err} (${status})` });
-      },
-    });
-  });
-}
-async function getTestHistoriesHandler(from, to, chunkSize = 100, delaySeconds = 2, chunkHandler) {
-  let curIndex = from;
-  while (curIndex <= to)
-  {
-    let thisChunkSize = Math.min(chunkSize, to - curIndex + 1);
-    let chunkPromises = [];
-    for (let i = 0; i < thisChunkSize; i++)
-    {
-      let myPromise = getTestHistory(curIndex + i);
-      chunkPromises.push(myPromise);
-    }
-    let chunkComplete = await Promise.all(chunkPromises);
-    await chunkHandler(curIndex, curIndex + thisChunkSize - 1, chunkComplete);
-    curIndex += thisChunkSize;
-    if (curIndex <= to) await sleep(delaySeconds * 1000);
-  }
-}
-
-async function sinkTestHistory(from, to, eachN = 100, chunkSize = 100, delaySeconds = 5) {
-  let cxt = { arr: [], start: null };
-  let i = 0;
-  await getTestHistoriesHandler(
-    from, to, chunkSize, delaySeconds,
-    async (start, end, chunk) => {
-
-      if (!cxt.start) cxt.start = start;
-      cxt.arr.push(...chunk);
-
-      if (++i == eachN) {
-        i = 0;
-        let mySlice = cxt.arr;
-        let myStart = cxt.start;
-        cxt.arr = [];
-        cxt.start = null;
-
-        addButton(`th.${myStart}-${end}`, async (button) => {
-          await writeFile(`th.${myStart}-${end}.json`, mySlice);
-          button.remove();
-        });
-      }
-
-    });
-}
+function dipeek_get_question(i){
+  let a=__dipeek_cur();i=i||dipeek_find_question_id();
+  let us=Object.keys(a.res_array).filter(k=>k!="final_result");
+  for(let ui of us){let u=a.res_array[ui];
+    let ts=Object.keys(u).filter(k=>k!="didact");
+    for(let ti of ts){let t=u[ti];
+      let qs=Object.keys(t).filter(k=>k!="param"&&k!="result");
+      for(let qi of qs)if(+qi==i)return t[qi]}}
+  return null}
+function dipeek_show_question(q){
+  if(_t&&!q){if(_tlq){let ind=_tqs.indexOf(_tlq)+1;
+      if(ind==_tqs.length)ind=0;_tlq=q=_tqs[ind]}
+    else _tlq=q=_tqs[0];}
+  if(typeof q=="number"||!q)q=dipeek_get_question(q);
+  console.log(q)}
 
 clear();

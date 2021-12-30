@@ -87,19 +87,6 @@ const FeatureList = [
       </Translate>
     ),
   },
-  {
-    title: (
-      <Translate id="features.7">
-        {"Непостоянный хостинг"}
-      </Translate>
-    ),
-    svg: emptyPng,
-    description: (
-      <Translate id="features.7.description">
-        {"Пока что DiPeek хостится, когда у хоста включен компьютер. Позже он будет перенесён на выделенный сервер, и будет доступен 24/7."}
-      </Translate>
-    ),
-  },
 ];
 
 function Feature({svg, title, description}) {
