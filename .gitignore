@@ -1,6 +1,9 @@
 # The Database
 dispace.sqlite
 
+# Forked repository
+/fork
+
 # The file with the bot's token
 config.xml
 
